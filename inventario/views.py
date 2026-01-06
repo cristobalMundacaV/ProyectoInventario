@@ -38,7 +38,10 @@ def producto_create(request):
 	if request.method == 'POST':
 		form = ProductoForm(request.POST)
 		if form.is_valid():
-			form.save()
+			producto = form.save(commit=False)
+			if producto.tipo_producto in ['PACK', 'UNITARIO']:
+				producto.stock_minimo = int(producto.stock_minimo)
+			producto.save()
 			return redirect('producto_list')
 	else:
 		form = ProductoForm()
@@ -50,7 +53,10 @@ def producto_update(request, pk):
 	if request.method == 'POST':
 		form = ProductoForm(request.POST, instance=producto)
 		if form.is_valid():
-			form.save()
+			producto = form.save(commit=False)
+			if producto.tipo_producto in ['PACK', 'UNITARIO']:
+				producto.stock_minimo = int(producto.stock_minimo)
+			producto.save()
 			return redirect('producto_list')
 	else:
 		form = ProductoForm(instance=producto)
