@@ -13,7 +13,7 @@ class Caja(models.Model):
     ganancia_diaria = models.DecimalField(max_digits=10, decimal_places=2)
 
     abierta = models.BooleanField(default=True)
-    hora_apertura = models.DateTimeField()
+    hora_apertura = models.DateTimeField(blank=True, null=True)
     hora_cierre = models.DateTimeField(blank=True, null=True)
 
     abierta_por = models.ForeignKey(

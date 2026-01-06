@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% block titulo %}Nueva Venta{% endblock %}
+{% block contenido %}
+<div class="row">
+    <div class="col-12 col-md-10 col-lg-9 mx-auto">
+        <div class="card shadow border-0">
+            <div class="card-header bg-primary text-white fw-bold">
+                <i class="bi bi-currency-dollar"></i> Registrar Venta (placeholder)
+            </div>
+            <div class="card-body">
+                <form method="post" id="ventaForm">
+                    {% csrf_token %}
+                    {{ dformset.management_form }}
+
+                    <div id="detalles">
+                        {% for form in dformset.forms %}
+                        <div class="card mb-2 p-3 detalle-line">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-5">
+                                    <label class="form-label fw-semibold">{{ form.producto.label }}{% if form.producto.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                                    {{ form.producto }}
+                                    {% for error in form.producto.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                    <div class="form-text text-muted stock-info" data-for-select="{{ form.prefix }}-producto"></div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">{{ form.unidad_venta.label }}{% if form.unidad_venta.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                                    {{ form.unidad_venta }}
+                                    {% for error in form.unidad_venta.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">{{ form.cantidad_ingresada.label }}{% if form.cantidad_ingresada.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                                    {{ form.cantidad_ingresada }}
+                                    {% for error in form.cantidad_ingresada.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-1 text-end">
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Eliminar línea">&times;</button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <button type="button" id="addLine" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus"></i> Agregar línea</button>
+                    </div>
+
+                    <hr>
+
+                    <h5 class="mb-3">Venta</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">{{ vform.metodo_pago.label }}{% if vform.metodo_pago.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {{ vform.metodo_pago }}
+                        {% for error in vform.metodo_pago.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">{{ vform.usuario.label }}{% if vform.usuario.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                            {{ vform.usuario }}
+                            {% for error in vform.usuario.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">{{ vform.caja.label }}{% if vform.caja.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                            {{ vform.caja }}
+                            {% for error in vform.caja.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="submit" class="btn btn-success shadow"><i class="bi bi-check-circle"></i> Confirmar Venta</button>
+                        <a href="{% url 'venta_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Templates ocultos para clonación segura -->
+<div id="product-template" style="display:none;">
+    <select class="form-select">
+        {% for p in products %}
+        <option value="{{ p.id }}">{{ p.nombre }} - ({{ p.stock_display }})</option>
+        {% endfor %}
+    </select>
+</div>
+<div id="unidad-template" style="display:none;">
+    <select class="form-select">
+        {% for code,label in unidad_choices %}
+        <option value="{{ code }}">{{ label }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const stockMap = {{ product_stock_map|safe }};
+    const productHtml = document.getElementById('product-template').innerHTML;
+    const unidadHtml = document.getElementById('unidad-template').innerHTML;
+
+    function updateStockInfo(line) {
+        const select = line.querySelector('select[name$="-producto"]');
+        const info = line.querySelector('.stock-info');
+        if (!select || !info) return;
+        const val = select.value;
+        if (val && stockMap[val] !== undefined) {
+            info.textContent = 'Stock disponible: ' + stockMap[val];
+        } else {
+            info.textContent = '';
+        }
+    }
+
+    function attachEventsToLine(line) {
+        const select = line.querySelector('select[name$="-producto"]');
+        const removeBtn = line.querySelector('.remove-line');
+        if (select) select.addEventListener('change', function() { updateStockInfo(line); });
+        if (removeBtn) removeBtn.addEventListener('click', function() { line.remove(); updateTotalForms(); });
+        updateStockInfo(line);
+    }
+
+    function updateTotalForms() {
+        const totalForms = document.getElementById('id_form-TOTAL_FORMS');
+        const count = document.querySelectorAll('.detalle-line').length;
+        if (totalForms) totalForms.value = count;
+    }
+
+    // initialize existing lines
+    document.querySelectorAll('.detalle-line').forEach(function(line) { attachEventsToLine(line); });
+
+    document.getElementById('addLine').addEventListener('click', function() {
+        const totalForms = document.getElementById('id_form-TOTAL_FORMS');
+        const count = parseInt(totalForms.value);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'card mb-2 p-3 detalle-line';
+        wrapper.innerHTML = `
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5"></div>
+                <div class="col-md-3"></div>
+                <div class="col-md-3"></div>
+                <div class="col-md-1 text-end"></div>
+            </div>`;
+
+        // product column
+        const prodCol = wrapper.querySelector('.col-md-5');
+        prodCol.innerHTML = `<label class="form-label fw-semibold">Producto <span class="text-danger">*</span></label>` + productHtml + `<div class="form-text text-muted stock-info"></div>`;
+        prodCol.querySelector('select').name = `form-${count}-producto`;
+
+        // unidad column
+        const unidadCol = wrapper.querySelector('.col-md-3');
+        unidadCol.innerHTML = `<label class="form-label fw-semibold">Unidad <span class="text-danger">*</span></label>` + unidadHtml;
+        unidadCol.querySelector('select').name = `form-${count}-unidad_venta`;
+
+        // cantidad column (second one)
+        const cantidadCol = wrapper.querySelectorAll('.col-md-3')[1];
+        cantidadCol.innerHTML = `<label class="form-label fw-semibold">Cantidad <span class="text-danger">*</span></label><input step="0.001" class="form-control" name="form-${count}-cantidad_ingresada" type="number">`;
+
+        // remove button
+        const removeCol = wrapper.querySelector('.col-md-1.text-end');
+        removeCol.innerHTML = `<button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Eliminar línea">&times;</button>`;
+
+        document.getElementById('detalles').appendChild(wrapper);
+        updateTotalForms();
+        attachEventsToLine(wrapper);
+    });
+
+});
+</script>
+
+{% endblock %}

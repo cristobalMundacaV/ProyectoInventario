@@ -46,6 +46,15 @@
         .nav-link:hover {
             color: #ffd700 !important;
         }
+        /* Reduce spacing specifically entre Inventario y Ventas (más cercano: 3x) */
+        #ventasDropdown {
+            margin-left: 1px !important; /* ahora más cercano: 1px */
+            margin-right: 6px !important;
+        }
+        /* Ajuste para el badge de bienvenida: reducir margen derecho 25px en total (15px más) */
+        #welcomeBadge {
+            margin-right: -15px !important; /* 15px más hacia la derecha del menú (pegado) */
+        }
         .contenedor-principal {
             background: #ffffff; /* Blanco */
             border-radius: 15px;
@@ -118,8 +127,21 @@
                             -->
                         </ul>
                     </li>
+
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="ventasDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-currency-dollar"></i> Ventas
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'venta_list' %}">Ventas</a></li>
+                            <li><a class="dropdown-item" href="{% url 'venta_create' %}">Nueva Venta</a></li>
+                        </ul>
+                    </li>
                 </ul>
                 <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <span id="welcomeBadge" class="nav-link">🎉 Bienvenido</span>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-person-circle"></i> {{ user.username }}
