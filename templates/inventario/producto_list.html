@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block titulo %}Productos{% endblock %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-primary"><i class="bi bi-box"></i> Productos</h2>
+    <a href="{% url 'producto_create' %}" class="btn btn-success shadow"><i class="bi bi-plus-circle"></i> Nuevo Producto</a>
+</div>
+<form method="get" class="mb-4">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label mb-1">Nombre</label>
+      <input type="text" name="nombre" value="{{ filtros.nombre }}" class="form-control" placeholder="Buscar por nombre...">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label mb-1">Categoría</label>
+      <select name="categoria" class="form-select">
+        <option value="">Todas</option>
+        {% for cat in categorias %}
+          <option value="{{ cat.id }}" {% if filtros.categoria == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label mb-1">Código de Barra</label>
+      <input type="text" name="codigo_barra" value="{{ filtros.codigo_barra }}" class="form-control" placeholder="Buscar por código...">
+    </div>
+    <div class="col-md-2 d-grid">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Filtrar</button>
+    </div>
+  </div>
+</form>
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                      <th>Código de Barra</th>
+                      <th>Nombre</th>
+                      <th>Categoría</th>
+                      <th>Tipo</th>
+                      <th>Stock Mínimo</th>
+                      <th>Stock</th>
+                      <th>Precio Compra</th>
+                      <th>Precio Venta</th>
+                      <th>Margen</th>
+                      <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for producto in productos %}
+                    <tr>
+                      <td>{{ producto.codigo_barra }}</td>
+                      <td class="fw-semibold">{{ producto.nombre }}</td>
+                      <td>{{ producto.categoria }}</td>
+                      <td>{{ producto.get_tipo_producto_display }}</td>
+                      <td>{{ producto.stock_minimo_display }}</td>
+                      <td><span class="badge bg-info text-dark">{{ producto.stock_display }}</span></td>
+                      <td><span class="badge bg-warning text-dark">${{ producto.precio_compra }}</span></td>
+                      <td><span class="badge bg-success">${{ producto.precio_venta }}</span></td>
+                      <td><span class="badge bg-secondary">${{ producto.precio_venta|floatformat:2|add:"-"|add:producto.precio_compra|floatformat:2 }}</span></td>
+                      <td class="text-center">
+                        <a href="{% url 'producto_update' producto.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
+                        <a href="{% url 'producto_delete' producto.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="bi bi-trash"></i></a>
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="9" class="text-center text-muted">No hay productos.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

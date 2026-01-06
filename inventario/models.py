@@ -10,9 +10,15 @@ class Categoria(models.Model):
         return self.nombre
 
 class Producto(models.Model):
+    @property
+    def stock_minimo_display(self):
+        if self.tipo_producto in ['PACK', 'UNIDAD']:
+            return int(self.stock_minimo)
+        return self.stock_minimo
+
     codigo_barra = models.CharField(max_length=50, unique=True)
     nombre = models.CharField(max_length=100)
-    categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT)
+    categoria = models.CharField(max_length=50)
     tipo_producto = models.CharField(max_length=10, choices=TipoProducto.choices)
     unidad_base = models.CharField(max_length=10, choices=UnidadBase.choices)
 
@@ -30,16 +36,11 @@ class Producto(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def stock_display(self):
+        if self.tipo_producto == 'GRANEL':
+            return self.stock_base
+        return int(self.stock_base)
+
     def __str__(self):
         return self.nombre
-
-class IngresoStock(models.Model):
-    fecha = models.DateTimeField(auto_now_add=True)
-    usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT)
-    observacion = models.CharField(max_length=200, blank=True, null=True)
-
-class IngresoStockDetalle(models.Model):
-    ingreso = models.ForeignKey(IngresoStock, on_delete=models.CASCADE, related_name='detalles')
-    producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
-    cantidad_base = models.DecimalField(max_digits=10, decimal_places=3)
-
