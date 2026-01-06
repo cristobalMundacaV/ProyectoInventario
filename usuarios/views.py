@@ -4,7 +4,7 @@ def logout_view(request):
 	return redirect('login')
 from django.shortcuts import redirect
 def root_redirect(request):
-	return redirect('login')
+	return redirect('venta_create')
 from django.contrib.auth.decorators import login_required
 @login_required
 def inicio(request):

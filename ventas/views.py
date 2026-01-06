@@ -40,28 +40,15 @@ def venta_create(request):
                     unidad_venta = form.cleaned_data['unidad_venta']
                     cantidad_ingresada = form.cleaned_data['cantidad_ingresada']
 
-                    # compute cantidad_base
-                    if unidad_venta == 'UNIDAD' or unidad_venta == 'KG':
-                        cantidad_base = cantidad_ingresada
-                    elif unidad_venta == 'CAJA':
-                        if producto.unidades_por_pack:
-                            cantidad_base = cantidad_ingresada * Decimal(producto.unidades_por_pack)
-                        elif producto.kg_por_caja:
-                            cantidad_base = cantidad_ingresada * Decimal(producto.kg_por_caja)
-                        else:
-                            cantidad_base = cantidad_ingresada
-                    else:
-                        cantidad_base = cantidad_ingresada
+                    # compute cantidad_base (simplificado)
+                    cantidad_base = cantidad_ingresada
 
                     # accumulate per product
                     required.setdefault(producto.id, Decimal('0'))
                     required[producto.id] += cantidad_base
 
-                    # compute precio_unitario
-                    if unidad_venta == 'CAJA' and producto.unidades_por_pack:
-                        precio_unitario = producto.precio_venta * Decimal(producto.unidades_por_pack)
-                    else:
-                        precio_unitario = producto.precio_venta
+                    # compute precio_unitario (simplificado)
+                    precio_unitario = producto.precio_venta
 
                     subtotal = (precio_unitario * cantidad_ingresada).quantize(Decimal('0.01'))
 
@@ -71,60 +58,55 @@ def venta_create(request):
                         'cantidad_ingresada': cantidad_ingresada,
                         'cantidad_base': cantidad_base,
                         'precio_unitario': precio_unitario,
-                        'subtotal': subtotal,
+                        'subtotal': subtotal
                     })
 
-            # validate stock
-            insuficiente = []
-            for pid, req in required.items():
-                prod = Producto.objects.get(id=pid)
-                if req > prod.stock_base:
-                    insuficiente.append((prod, req, prod.stock_base))
+            # check stock availability
+            stock_insuficiente = False
+            for product_id, required_qty in required.items():
+                available_stock = product_stock_map.get(str(product_id), '0')
+                if Decimal(required_qty) > Decimal(available_stock):
+                    stock_insuficiente = True
+                    break
 
-            if insuficiente:
-                for prod, req, avail in insuficiente:
-                    messages.error(request, f'Stock insuficiente para {prod.nombre}: requerido {req}, disponible {avail}')
-            else:
-                # save venta and detalles
-                venta = Venta.objects.create(
-                    metodo_pago=vform.cleaned_data['metodo_pago'],
-                    usuario=vform.cleaned_data['usuario'],
-                    caja=vform.cleaned_data['caja'],
-                    total=Decimal('0.00')
+            if stock_insuficiente:
+                messages.error(request, 'Stock insuficiente para algunos productos.')
+                return render(request, 'ventas/venta_form.html', {
+                    'vform': vform,
+                    'dformset': dformset,
+                    'products': products,
+                    'product_stock_map': product_stock_map,
+                    'unidad_choices': unidad_choices,
+                })
+
+            # create venta
+            venta = vform.save(commit=False)
+            venta.total = sum(d['subtotal'] for d in detalles)
+            venta.save()
+
+            # create venta detalles
+            for detalle_data in detalles:
+                VentaDetalle.objects.create(
+                    venta=venta,
+                    producto=detalle_data['producto'],
+                    unidad_venta=detalle_data['unidad_venta'],
+                    cantidad_ingresada=detalle_data['cantidad_ingresada'],
+                    cantidad_base=detalle_data['cantidad_base'],
+                    precio_unitario=detalle_data['precio_unitario'],
+                    subtotal=detalle_data['subtotal']
                 )
-                total = Decimal('0.00')
-                for det in detalles:
-                    VentaDetalle.objects.create(
-                        venta=venta,
-                        producto=det['producto'],
-                        cantidad_ingresada=det['cantidad_ingresada'],
-                        unidad_venta=det['unidad_venta'],
-                        cantidad_base=det['cantidad_base'],
-                        precio_unitario=det['precio_unitario'],
-                        subtotal=det['subtotal'],
-                    )
-                    # descontar stock
-                    p = det['producto']
-                    p.stock_base = p.stock_base - det['cantidad_base']
-                    p.save()
-                    total += det['subtotal']
 
-                venta.total = total.quantize(Decimal('0.01'))
-                venta.save()
+            messages.success(request, 'Venta creada exitosamente.')
+            return redirect('venta_list')
 
-                messages.success(request, 'Venta registrada y stock descontado correctamente.')
-                return redirect('venta_list')
-        else:
-            messages.error(request, 'Corrige los errores en el formulario.')
     else:
         vform = VentaForm(metodo_choices=metodo_choices, usuario_qs=usuarios, caja_qs=cajas)
         dformset = VentaDetalleFormSet(form_kwargs={'unidad_choices': unidad_choices})
 
-    context = {
+    return render(request, 'ventas/venta_form.html', {
         'vform': vform,
         'dformset': dformset,
-        'product_stock_map': product_stock_map,
         'products': products,
+        'product_stock_map': product_stock_map,
         'unidad_choices': unidad_choices,
-    }
-    return render(request, 'ventas/venta_form.html', context)
+    })

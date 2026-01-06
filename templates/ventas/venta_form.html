@@ -2,57 +2,64 @@
 {% block titulo %}Nueva Venta{% endblock %}
 {% block contenido %}
 <div class="row">
-    <div class="col-12 col-md-10 col-lg-9 mx-auto">
+    <div class="col-12 col-md-10 col-lg-11 mx-auto">
         <div class="card shadow border-0">
             <div class="card-header bg-primary text-white fw-bold">
-                <i class="bi bi-currency-dollar"></i> Registrar Venta (placeholder)
+                <i class="bi bi-currency-dollar"></i> Registrar Venta
             </div>
             <div class="card-body">
                 <form method="post" id="ventaForm">
                     {% csrf_token %}
                     {{ dformset.management_form }}
 
-                    <div id="detalles">
-                        {% for form in dformset.forms %}
-                        <div class="card mb-2 p-3 detalle-line">
-                            <div class="row g-2 align-items-end">
-                                <div class="col-md-5">
-                                    <label class="form-label fw-semibold">{{ form.producto.label }}{% if form.producto.field.required %} <span class="text-danger">*</span>{% endif %}</label>
-                                    {{ form.producto }}
-                                    {% for error in form.producto.errors %}
-                                        <div class="text-danger small">{{ error }}</div>
-                                    {% endfor %}
-                                    <div class="form-text text-muted stock-info" data-for-select="{{ form.prefix }}-producto"></div>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label fw-semibold">{{ form.unidad_venta.label }}{% if form.unidad_venta.field.required %} <span class="text-danger">*</span>{% endif %}</label>
-                                    {{ form.unidad_venta }}
-                                    {% for error in form.unidad_venta.errors %}
-                                        <div class="text-danger small">{{ error }}</div>
-                                    {% endfor %}
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label fw-semibold">{{ form.cantidad_ingresada.label }}{% if form.cantidad_ingresada.field.required %} <span class="text-danger">*</span>{% endif %}</label>
-                                    {{ form.cantidad_ingresada }}
-                                    {% for error in form.cantidad_ingresada.errors %}
-                                        <div class="text-danger small">{{ error }}</div>
-                                    {% endfor %}
-                                </div>
-                                <div class="col-md-1 text-end">
-                                    <button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Eliminar línea">&times;</button>
-                                </div>
-                            </div>
+                    <!-- Scanner de códigos de barras -->
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Escanear Código de Barras</label>
+                            <input type="text" id="barcodeScanner" class="form-control" placeholder="Apunte el lector aquí o escriba el código..." autocomplete="off">
                         </div>
-                        {% endfor %}
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Cantidad</label>
+                            <input type="number" id="defaultQuantity" class="form-control" value="1" step="0.001" min="0.001">
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <button type="button" id="addLine" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus"></i> Agregar línea</button>
+                    <!-- Tabla de productos -->
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered table-hover" id="productosTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Producto</th>
+                                    <th>Precio Unit.</th>
+                                    <th>Cantidad</th>
+                                    <th>Unidad</th>
+                                    <th>Subtotal</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productosTableBody">
+                                <!-- Los productos se agregarán aquí dinámicamente -->
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <th colspan="5" class="text-end">TOTAL:</th>
+                                    <th id="totalAmount">$0.00</th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Campos ocultos para el formset -->
+                    <div id="hiddenFields" style="display:none;">
+                        {% for form in dformset.forms %}
+                        {% endfor %}
                     </div>
 
                     <hr>
 
-                    <h5 class="mb-3">Venta</h5>
+                    <h5 class="mb-3">Datos de la Venta</h5>
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">{{ vform.metodo_pago.label }}{% if vform.metodo_pago.field.required %} <span class="text-danger">*</span>{% endif %}</label>
@@ -88,94 +95,187 @@
     </div>
 </div>
 
-<!-- Templates ocultos para clonación segura -->
-<div id="product-template" style="display:none;">
-    <select class="form-select">
-        {% for p in products %}
-        <option value="{{ p.id }}">{{ p.nombre }} - ({{ p.stock_display }})</option>
-        {% endfor %}
-    </select>
-</div>
-<div id="unidad-template" style="display:none;">
-    <select class="form-select">
-        {% for code,label in unidad_choices %}
-        <option value="{{ code }}">{{ label }}</option>
-        {% endfor %}
-    </select>
-</div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const productsData = {{ products|safe }};
     const stockMap = {{ product_stock_map|safe }};
-    const productHtml = document.getElementById('product-template').innerHTML;
-    const unidadHtml = document.getElementById('unidad-template').innerHTML;
+    
+    let productosAgregados = [];
+    let formCounter = 0;
 
-    function updateStockInfo(line) {
-        const select = line.querySelector('select[name$="-producto"]');
-        const info = line.querySelector('.stock-info');
-        if (!select || !info) return;
-        const val = select.value;
-        if (val && stockMap[val] !== undefined) {
-            info.textContent = 'Stock disponible: ' + stockMap[val];
+    // Mapeo de productos por código de barras
+    const productByBarcode = {};
+    productsData.forEach(function(p) {
+        productByBarcode[p.codigo_barra] = p;
+    });
+
+    // Función para agregar producto a la tabla
+    function addProductToTable(barcode, quantity) {
+        quantity = quantity || 1;
+        const product = productByBarcode[barcode];
+        if (!product) {
+            alert('Producto no encontrado: ' + barcode);
+            return false;
+        }
+
+        // Verificar stock
+        const availableStock = parseFloat(stockMap[product.id]);
+        if (quantity > availableStock) {
+            alert('Stock insuficiente. Disponible: ' + availableStock);
+            return false;
+        }
+
+        // Verificar si ya existe en la tabla
+        const existingRow = document.querySelector('tr[data-barcode="' + barcode + '"]');
+        if (existingRow) {
+            // Actualizar cantidad si ya existe
+            const qtyCell = existingRow.querySelector('td[data-field="cantidad"]');
+            const currentQty = parseFloat(qtyCell.textContent);
+            const newQty = currentQty + quantity;
+            
+            if (newQty > availableStock) {
+                alert('Stock insuficiente. Disponible: ' + availableStock);
+                return false;
+            }
+            
+            qtyCell.textContent = newQty.toFixed(3);
+            updateRowSubtotal(existingRow);
         } else {
-            info.textContent = '';
+            // Agregar nueva fila
+            const tbody = document.getElementById('productosTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-barcode', barcode);
+            row.setAttribute('data-product-id', product.id);
+            
+            const unidadDisplay = getUnidadDisplay(product.tipo_producto);
+            const subtotal = (product.precio_venta * quantity).toFixed(2);
+            
+            row.innerHTML = '<td>' + product.codigo_barra + '</td>' +
+                '<td>' + product.nombre + '</td>' +
+                '<td>$' + product.precio_venta.toFixed(2) + '</td>' +
+                '<td data-field="cantidad">' + quantity.toFixed(3) + '</td>' +
+                '<td data-field="unidad">' + unidadDisplay + '</td>' +
+                '<td data-field="subtotal">$' + subtotal + '</td>' +
+                '<td><button type="button" class="btn btn-sm btn-outline-danger remove-product"><i class="bi bi-trash"></i></button></td>';
+            
+            tbody.appendChild(row);
+            attachRowEvents(row);
+        }
+        
+        updateTotal();
+        updateHiddenFields();
+        return true;
+    }
+
+    function getUnidadDisplay(tipoProducto) {
+        switch(tipoProducto) {
+            case 'UNITARIO': return 'UNIDAD';
+            case 'PACK': return 'CAJA';
+            case 'GRANEL': return 'KG';
+            default: return 'UNIDAD';
         }
     }
 
-    function attachEventsToLine(line) {
-        const select = line.querySelector('select[name$="-producto"]');
-        const removeBtn = line.querySelector('.remove-line');
-        if (select) select.addEventListener('change', function() { updateStockInfo(line); });
-        if (removeBtn) removeBtn.addEventListener('click', function() { line.remove(); updateTotalForms(); });
-        updateStockInfo(line);
+    function updateRowSubtotal(row) {
+        const price = parseFloat(row.cells[2].textContent.replace('$', ''));
+        const quantity = parseFloat(row.cells[3].textContent);
+        const subtotal = (price * quantity).toFixed(2);
+        row.cells[5].textContent = '$' + subtotal;
     }
 
-    function updateTotalForms() {
-        const totalForms = document.getElementById('id_form-TOTAL_FORMS');
-        const count = document.querySelectorAll('.detalle-line').length;
-        if (totalForms) totalForms.value = count;
+    function updateTotal() {
+        let total = 0;
+        const rows = document.querySelectorAll('#productosTableBody tr');
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const subtotal = parseFloat(row.cells[5].textContent.replace('$', ''));
+            total += subtotal;
+        }
+        document.getElementById('totalAmount').textContent = '$' + total.toFixed(2);
     }
 
-    // initialize existing lines
-    document.querySelectorAll('.detalle-line').forEach(function(line) { attachEventsToLine(line); });
+    function attachRowEvents(row) {
+        const removeBtn = row.querySelector('.remove-product');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                row.remove();
+                updateTotal();
+                updateHiddenFields();
+            });
+        }
+    }
 
-    document.getElementById('addLine').addEventListener('click', function() {
-        const totalForms = document.getElementById('id_form-TOTAL_FORMS');
-        const count = parseInt(totalForms.value);
+    function updateHiddenFields() {
+        const hiddenContainer = document.getElementById('hiddenFields');
+        hiddenContainer.innerHTML = '';
+        
+        const rows = document.querySelectorAll('#productosTableBody tr');
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const productId = row.getAttribute('data-product-id');
+            const barcode = row.getAttribute('data-barcode');
+            const quantity = parseFloat(row.cells[3].textContent);
+            
+            // Crear campos ocultos para el formset
+            const formIndex = i;
+            
+            // Producto
+            const productInput = document.createElement('input');
+            productInput.type = 'hidden';
+            productInput.name = 'form-' + formIndex + '-producto';
+            productInput.value = productId;
+            hiddenContainer.appendChild(productInput);
+            
+            // Unidad venta
+            const unidadInput = document.createElement('input');
+            unidadInput.type = 'hidden';
+            unidadInput.name = 'form-' + formIndex + '-unidad_venta';
+            unidadInput.value = getUnidadDisplay(productByBarcode[barcode].tipo_producto);
+            hiddenContainer.appendChild(unidadInput);
+            
+            // Cantidad
+            const cantidadInput = document.createElement('input');
+            cantidadInput.type = 'hidden';
+            cantidadInput.name = 'form-' + formIndex + '-cantidad_ingresada';
+            cantidadInput.value = quantity;
+            hiddenContainer.appendChild(cantidadInput);
+        }
+        
+        // Actualizar TOTAL_FORMS
+        const totalFormsInput = document.getElementById('id_form-TOTAL_FORMS');
+        if (totalFormsInput) {
+            totalFormsInput.value = rows.length;
+        }
+    }
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'card mb-2 p-3 detalle-line';
-        wrapper.innerHTML = `
-            <div class="row g-2 align-items-end">
-                <div class="col-md-5"></div>
-                <div class="col-md-3"></div>
-                <div class="col-md-3"></div>
-                <div class="col-md-1 text-end"></div>
-            </div>`;
+    // Event listener para el scanner
+    const scannerElement = document.getElementById('barcodeScanner');
+    if (scannerElement) {
+        scannerElement.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const barcode = this.value.trim();
+                const quantity = parseFloat(document.getElementById('defaultQuantity').value) || 1;
+                
+                if (barcode) {
+                    if (addProductToTable(barcode, quantity)) {
+                        this.value = '';
+                        document.getElementById('defaultQuantity').value = '1';
+                    }
+                }
+            }
+        });
+    }
 
-        // product column
-        const prodCol = wrapper.querySelector('.col-md-5');
-        prodCol.innerHTML = `<label class="form-label fw-semibold">Producto <span class="text-danger">*</span></label>` + productHtml + `<div class="form-text text-muted stock-info"></div>`;
-        prodCol.querySelector('select').name = `form-${count}-producto`;
-
-        // unidad column
-        const unidadCol = wrapper.querySelector('.col-md-3');
-        unidadCol.innerHTML = `<label class="form-label fw-semibold">Unidad <span class="text-danger">*</span></label>` + unidadHtml;
-        unidadCol.querySelector('select').name = `form-${count}-unidad_venta`;
-
-        // cantidad column (second one)
-        const cantidadCol = wrapper.querySelectorAll('.col-md-3')[1];
-        cantidadCol.innerHTML = `<label class="form-label fw-semibold">Cantidad <span class="text-danger">*</span></label><input step="0.001" class="form-control" name="form-${count}-cantidad_ingresada" type="number">`;
-
-        // remove button
-        const removeCol = wrapper.querySelector('.col-md-1.text-end');
-        removeCol.innerHTML = `<button type="button" class="btn btn-outline-danger btn-sm remove-line" title="Eliminar línea">&times;</button>`;
-
-        document.getElementById('detalles').appendChild(wrapper);
-        updateTotalForms();
-        attachEventsToLine(wrapper);
-    });
-
+    // Prevenir envío del formulario con Enter
+    const formElement = document.getElementById('ventaForm');
+    if (formElement) {
+        formElement.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.id !== 'barcodeScanner') {
+                e.preventDefault();
+            }
+        });
+    }
 });
 </script>
 
