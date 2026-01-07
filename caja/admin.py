@@ -1,11 +1,37 @@
+# caja/admin.py
 from django.contrib import admin
-from django.apps import apps
+from django.utils import timezone
+from .models import Caja
 
 
-# Auto-register all models in this app
-app_models = apps.get_app_config('caja').get_models()
-for model in app_models:
-    try:
-        admin.site.register(model)
-    except admin.sites.AlreadyRegistered:
-        pass
+@admin.register(Caja)
+class CajaAdmin(admin.ModelAdmin):
+    list_display = (
+        'fecha',
+        'abierta',
+        'hora_apertura',
+        'hora_cierre',
+        'total_vendido',
+    )
+
+    list_filter = ('abierta', 'fecha')
+    search_fields = ('fecha',)
+
+    readonly_fields = (
+        'hora_apertura',
+        'hora_cierre',
+        'total_vendido',
+        'total_efectivo',
+        'total_debito',
+        'total_transferencia',
+        'ganancia_diaria',
+    )
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.hora_apertura = timezone.now()
+
+        if change and not obj.abierta and obj.hora_cierre is None:
+            obj.hora_cierre = timezone.now()
+
+        super().save_model(request, obj, form, change)

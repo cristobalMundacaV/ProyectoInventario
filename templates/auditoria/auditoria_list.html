@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Auditoría del Sistema{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-history"></i>
+                        Historial de Actividades
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% if actividades %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Fecha y Hora</th>
+                                    <th>Usuario</th>
+                                    <th>Tipo de Acción</th>
+                                    <th>Descripción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for actividad in actividades %}
+                                <tr>
+                                    <td>{{ actividad.fecha_hora|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ actividad.usuario.username }}</td>
+                                    <td>
+                                        {% if actividad.tipo_accion == 'APERTURA_CAJA' %}
+                                        <span class="badge bg-success">Apertura Caja</span>
+                                        {% elif actividad.tipo_accion == 'CIERRE_CAJA' %}
+                                        <span class="badge bg-danger">Cierre Caja</span>
+                                        {% elif actividad.tipo_accion == 'VENTA' %}
+                                        <span class="badge bg-primary">Venta</span>
+                                        {% elif actividad.tipo_accion == 'INGRESO_STOCK' %}
+                                        <span class="badge bg-info">Ingreso Stock</span>
+                                        {% elif actividad.tipo_accion == 'CREACION_PRODUCTO' %}
+                                        <span class="badge bg-warning">Creación Producto</span>
+                                        {% elif actividad.tipo_accion == 'EDICION_PRODUCTO' %}
+                                        <span class="badge bg-secondary">Edición Producto</span>
+                                        {% else %}
+                                        <span class="badge bg-light text-dark">{{ actividad.tipo_accion }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ actividad.descripcion }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        No hay actividades registradas en el sistema.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

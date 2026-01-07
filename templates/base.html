@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block titulo %}Sistema de Login{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+        }
+        
+        body {
+            background: #f8f9fa; /* Fondo claro por defecto */
+        }
+
+        body.login-page {
+            background: linear-gradient(135deg, #4e54c8, #8f94fb); /* Gradiente azul y púrpura */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 20px;
+            color: white !important;
+        }
+        .nav-link {
+            color: white !important;
+            margin: 0 10px;
+            transition: 0.3s;
+        }
+        .nav-link:hover {
+            color: #ffd700 !important;
+        }
+        /* Reduce spacing specifically entre Inventario y Ventas (más cercano: 3x) */
+        #ventasDropdown {
+            margin-left: 1px !important; /* ahora más cercano: 1px */
+            margin-right: 6px !important;
+        }
+        /* Ajuste para el badge de bienvenida: reducir margen derecho 25px en total (15px más) */
+        #welcomeBadge {
+            margin-right: -15px !important; /* 15px más hacia la derecha del menú (pegado) */
+        }
+        .contenedor-principal {
+            background: #ffffff; /* Blanco */
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 50px;
+            max-width: 400px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .contenedor-pagina {
+            margin-top: 20px;
+            padding: 20px;
+        }
+        .logo-titulo {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #4e54c8;
+            font-weight: bold;
+            font-size: 30px;
+        }
+        .btn-custom {
+            background: #4e54c8;
+            border: none;
+            color: white;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .btn-custom:hover {
+            background: #8f94fb;
+            color: white;
+        }
+        .card {
+            border: 1px solid #e0e0e0;
+        }
+        
+        .form-control {
+            border: 1px solid #ddd;
+            padding: 10px 15px;
+        }
+        
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+    </style>
+</head>
+<body{% if not user.is_authenticated %} class="login-page"{% endif %}>
+    {% if user.is_authenticated %}
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <i class="bi bi-currency-dollar"></i> Sistema
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="inventarioDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-box"></i> Inventario
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'producto_list' %}">Productos</a></li>
+                            <!-- Puedes agregar más opciones aquí, por ejemplo:
+                            <li><a class="dropdown-item" href="#">Categorías</a></li>
+                            <li><a class="dropdown-item" href="#">Ingresos de Stock</a></li>
+                            -->
+                        </ul>
+                    </li>
+
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="ventasDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-currency-dollar"></i> Ventas
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'venta_list' %}">Ventas</a></li>
+                            <li><a class="dropdown-item" href="{% url 'venta_create' %}">Nueva Venta</a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <span id="welcomeBadge" class="nav-link">🎉 Bienvenido</span>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#">Mi Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'logout' %}">
+                                <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+    
+    <div class="{% if user.is_authenticated %}contenedor-pagina{% else %}contenedor-principal{% endif %}">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        {% block contenido %}{% endblock %}
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

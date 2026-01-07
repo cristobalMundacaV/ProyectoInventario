@@ -1,11 +1,120 @@
 from django.contrib import admin
-from django.apps import apps
+from .models import (
+    Categoria,
+    Producto,
+    Presentacion,
+    IngresoStock,
+    IngresoStockDetalle
+)
 
 
-# Auto-register all models in this app
-app_models = apps.get_app_config('inventario').get_models()
-for model in app_models:
-    try:
-        admin.site.register(model)
-    except admin.sites.AlreadyRegistered:
-        pass
+# =========================
+# CATEGORIA
+# =========================
+@admin.register(Categoria)
+class CategoriaAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'descripcion')
+    search_fields = ('nombre',)
+    ordering = ('nombre',)
+
+
+# =========================
+# PRODUCTO
+# =========================
+@admin.register(Producto)
+class ProductoAdmin(admin.ModelAdmin):
+    list_display = (
+        'nombre',
+        'categoria',
+        'tipo_producto',
+        'unidad_base',
+        'stock_minimo',
+    )
+    list_filter = ('categoria', 'tipo_producto', 'unidad_base')
+    search_fields = ('nombre', 'categoria__nombre')
+    readonly_fields = ('created_at', 'updated_at')
+
+    fieldsets = (
+        ('Información del Producto', {
+            'fields': (
+                'nombre',
+                'categoria',
+                'tipo_producto',
+                'unidad_base',
+                'stock_minimo',
+            )
+        }),
+        ('Auditoría', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+
+# =========================
+# PRESENTACION
+# =========================
+@admin.register(Presentacion)
+class PresentacionAdmin(admin.ModelAdmin):
+    list_display = (
+        'producto',
+        'nombre',
+        'codigo_barra',
+        'unidad_venta',
+        'stock_base',
+        'precio_venta',
+        'activo',
+    )
+    def activo(self, obj):
+        return obj.stock_base > 0
+    list_filter = ('unidad_venta', 'producto__categoria')
+    search_fields = (
+        'nombre',
+        'codigo_barra',
+        'producto__nombre',
+    )
+    readonly_fields = ('created_at', 'updated_at', 'activo_property')
+
+    fieldsets = (
+        ('Producto', {
+            'fields': ('producto', 'nombre', 'codigo_barra')
+        }),
+        ('Configuración de Venta', {
+            'fields': ('unidad_venta', 'cantidad_base')
+        }),
+        ('Stock y Precios', {
+            'fields': (
+                'stock_base',
+                'precio_compra',
+                'precio_venta',
+                'margen_ganancia',
+            )
+        }),
+        ('Auditoría', {
+            'fields': ('created_at', 'updated_at', 'activo'),
+        }),
+    )
+
+
+# =========================
+# INGRESO DE STOCK
+# =========================
+class IngresoStockDetalleInline(admin.TabularInline):
+    model = IngresoStockDetalle
+    extra = 1
+
+
+@admin.register(IngresoStock)
+class IngresoStockAdmin(admin.ModelAdmin):
+    list_display = ('id', 'fecha', 'usuario', 'observacion')
+    search_fields = ('usuario__username',)
+    readonly_fields = ('fecha',)
+    inlines = (IngresoStockDetalleInline,)
+
+
+# =========================
+# INGRESO STOCK DETALLE
+# =========================
+@admin.register(IngresoStockDetalle)
+class IngresoStockDetalleAdmin(admin.ModelAdmin):
+    list_display = ('ingreso', 'presentacion', 'cantidad_base')
+    search_fields = ('presentacion__nombre', 'presentacion__codigo_barra')

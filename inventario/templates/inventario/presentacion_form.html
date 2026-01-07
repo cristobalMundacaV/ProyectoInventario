@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block titulo %}{{ accion }} Presentación{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <div class="card shadow border-0">
+            <div class="card-header bg-primary text-white fw-bold">
+                <i class="bi bi-box-seam"></i> {{ accion }} Presentación
+            </div>
+
+            <div class="card-body">
+                <form method="post" autocomplete="off">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="mb-3 text-primary">Datos del Producto</h5>
+                            
+                            {% for field in producto_form %}
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.help_text %}
+                                        <div class="form-text">{{ field.help_text }}</div>
+                                    {% endif %}
+                                    {% for error in field.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="mb-3 text-success">Datos de la Presentación</h5>
+                            
+                            {% for field in presentacion_form %}
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.help_text %}
+                                        <div class="form-text">{{ field.help_text }}</div>
+                                    {% endif %}
+                                    {% for error in field.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                            
+                            <!-- Margen solo visual -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Margen de ganancia</label>
+                                <input type="text" id="margen-preview" class="form-control bg-light" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="submit" class="btn btn-success shadow">
+                            <i class="bi bi-check-circle"></i> Guardar
+                        </button>
+                        <a href="{% url 'producto_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+
+                <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const compra = document.getElementById('id_precio_compra');
+                    const venta = document.getElementById('id_precio_venta');
+                    const margen = document.getElementById('margen-preview');
+
+                    function calcularMargen() {
+                        const pc = parseFloat(compra.value.replace(',', '.')) || 0;
+                        const pv = parseFloat(venta.value.replace(',', '.')) || 0;
+                        margen.value = (pv - pc).toFixed(2);
+                    }
+
+                    compra.addEventListener('input', calcularMargen);
+                    venta.addEventListener('input', calcularMargen);
+                });
+                </script>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

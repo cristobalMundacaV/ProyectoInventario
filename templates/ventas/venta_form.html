@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+{% block titulo %}Nueva Venta{% endblock %}
+{% block contenido %}
+<div class="row">
+    <div class="col-12 col-md-10 col-lg-11 mx-auto">
+        <div class="card shadow border-0">
+            <div class="card-header bg-primary text-white fw-bold">
+                <i class="bi bi-currency-dollar"></i> Registrar Venta
+            </div>
+            <div class="card-body">
+                <form method="post" id="ventaForm">
+                    {% csrf_token %}
+                    {{ dformset.management_form }}
+
+                    <!-- Scanner de códigos de barras -->
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Escanear Código de Barras</label>
+                            <input type="text" id="barcodeScanner" class="form-control" placeholder="Apunte el lector aquí o escriba el código..." autocomplete="off">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Cantidad</label>
+                            <input type="number" id="defaultQuantity" class="form-control" value="1" step="0.001" min="0.001">
+                        </div>
+                    </div>
+
+                    <!-- Tabla de productos -->
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered table-hover" id="productosTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Producto</th>
+                                    <th>Precio Unit.</th>
+                                    <th>Cantidad</th>
+                                    <th>Unidad</th>
+                                    <th>Subtotal</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productosTableBody">
+                                <!-- Los productos se agregarán aquí dinámicamente -->
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <th colspan="5" class="text-end">TOTAL:</th>
+                                    <th id="totalAmount">$0.00</th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Campos ocultos para el formset -->
+                    <div id="hiddenFields" style="display:none;">
+                        {% for form in dformset.forms %}
+                        {% endfor %}
+                    </div>
+
+                    <hr>
+
+                    <h5 class="mb-3">Datos de la Venta</h5>
+
+                    <!-- Información automática -->
+                    <div class="alert alert-info mb-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Usuario:</strong> {{ usuario_actual.username }}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Caja Activa:</strong> {{ caja_activa.fecha }} 
+                                <span class="badge bg-success">Abierta</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">{{ vform.metodo_pago.label }}{% if vform.metodo_pago.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {{ vform.metodo_pago }}
+                        {% for error in vform.metodo_pago.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="submit" class="btn btn-success shadow"><i class="bi bi-check-circle"></i> Confirmar Venta</button>
+                        <a href="{% url 'venta_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const productsData = {{ products|safe }};
+    const stockMap = {{ product_stock_map|safe }};
+    
+    let productosAgregados = [];
+    let formCounter = 0;
+
+    // Mapeo de productos por código de barras
+    const productByBarcode = {};
+    productsData.forEach(function(p) {
+        productByBarcode[p.codigo_barra] = p;
+    });
+
+    // Función para agregar producto a la tabla
+    function addProductToTable(barcode, quantity) {
+        quantity = quantity || 1;
+        const product = productByBarcode[barcode];
+        if (!product) {
+            alert('Producto no encontrado: ' + barcode);
+            return false;
+        }
+
+        // Verificar stock
+        const availableStock = parseFloat(stockMap[product.id]);
+        if (quantity > availableStock) {
+            alert('Stock insuficiente. Disponible: ' + availableStock);
+            return false;
+        }
+
+        // Verificar si ya existe en la tabla
+        const existingRow = document.querySelector('tr[data-barcode="' + barcode + '"]');
+        if (existingRow) {
+            // Actualizar cantidad si ya existe
+            const qtyCell = existingRow.querySelector('td[data-field="cantidad"]');
+            const currentQty = parseFloat(qtyCell.textContent);
+            const newQty = currentQty + quantity;
+            
+            if (newQty > availableStock) {
+                alert('Stock insuficiente. Disponible: ' + availableStock);
+                return false;
+            }
+            
+            qtyCell.textContent = newQty.toFixed(3);
+            updateRowSubtotal(existingRow);
+        } else {
+            // Agregar nueva fila
+            const tbody = document.getElementById('productosTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-barcode', barcode);
+            row.setAttribute('data-product-id', product.id);
+            
+            const unidadDisplay = getUnidadDisplay(product.tipo_producto);
+            const subtotal = (product.precio_venta * quantity).toFixed(2);
+            
+            row.innerHTML = '<td>' + product.codigo_barra + '</td>' +
+                '<td>' + product.nombre + '</td>' +
+                '<td>$' + product.precio_venta.toFixed(2) + '</td>' +
+                '<td data-field="cantidad">' + quantity.toFixed(3) + '</td>' +
+                '<td data-field="unidad">' + unidadDisplay + '</td>' +
+                '<td data-field="subtotal">$' + subtotal + '</td>' +
+                '<td><button type="button" class="btn btn-sm btn-outline-danger remove-product"><i class="bi bi-trash"></i></button></td>';
+            
+            tbody.appendChild(row);
+            attachRowEvents(row);
+        }
+        
+        updateTotal();
+        updateHiddenFields();
+        return true;
+    }
+
+    function getUnidadDisplay(tipoProducto) {
+        switch(tipoProducto) {
+            case 'UNITARIO': return 'UNIDAD';
+            case 'PACK': return 'CAJA';
+            case 'GRANEL': return 'KG';
+            default: return 'UNIDAD';
+        }
+    }
+
+    function updateRowSubtotal(row) {
+        const price = parseFloat(row.cells[2].textContent.replace('$', ''));
+        const quantity = parseFloat(row.cells[3].textContent);
+        const subtotal = (price * quantity).toFixed(2);
+        row.cells[5].textContent = '$' + subtotal;
+    }
+
+    function updateTotal() {
+        let total = 0;
+        const rows = document.querySelectorAll('#productosTableBody tr');
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const subtotal = parseFloat(row.cells[5].textContent.replace('$', ''));
+            total += subtotal;
+        }
+        document.getElementById('totalAmount').textContent = '$' + total.toFixed(2);
+    }
+
+    function attachRowEvents(row) {
+        const removeBtn = row.querySelector('.remove-product');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                row.remove();
+                updateTotal();
+                updateHiddenFields();
+            });
+        }
+    }
+
+    function updateHiddenFields() {
+        const hiddenContainer = document.getElementById('hiddenFields');
+        hiddenContainer.innerHTML = '';
+        
+        const rows = document.querySelectorAll('#productosTableBody tr');
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const productId = row.getAttribute('data-product-id');
+            const barcode = row.getAttribute('data-barcode');
+            const quantity = parseFloat(row.cells[3].textContent);
+            
+            // Crear campos ocultos para el formset
+            const formIndex = i;
+            
+            // Producto
+            const productInput = document.createElement('input');
+            productInput.type = 'hidden';
+            productInput.name = 'form-' + formIndex + '-producto';
+            productInput.value = productId;
+            hiddenContainer.appendChild(productInput);
+            
+            // Unidad venta
+            const unidadInput = document.createElement('input');
+            unidadInput.type = 'hidden';
+            unidadInput.name = 'form-' + formIndex + '-unidad_venta';
+            unidadInput.value = getUnidadDisplay(productByBarcode[barcode].tipo_producto);
+            hiddenContainer.appendChild(unidadInput);
+            
+            // Cantidad
+            const cantidadInput = document.createElement('input');
+            cantidadInput.type = 'hidden';
+            cantidadInput.name = 'form-' + formIndex + '-cantidad_ingresada';
+            cantidadInput.value = quantity;
+            hiddenContainer.appendChild(cantidadInput);
+        }
+        
+        // Actualizar TOTAL_FORMS
+        const totalFormsInput = document.getElementById('id_form-TOTAL_FORMS');
+        if (totalFormsInput) {
+            totalFormsInput.value = rows.length;
+        }
+    }
+
+    // Event listener para el scanner
+    const scannerElement = document.getElementById('barcodeScanner');
+    if (scannerElement) {
+        scannerElement.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const barcode = this.value.trim();
+                const quantity = parseFloat(document.getElementById('defaultQuantity').value) || 1;
+                
+                if (barcode) {
+                    if (addProductToTable(barcode, quantity)) {
+                        this.value = '';
+                        document.getElementById('defaultQuantity').value = '1';
+                    }
+                }
+            }
+        });
+    }
+
+    // Prevenir envío del formulario con Enter
+    const formElement = document.getElementById('ventaForm');
+    if (formElement) {
+        formElement.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.id !== 'barcodeScanner') {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>
+
+{% endblock %}

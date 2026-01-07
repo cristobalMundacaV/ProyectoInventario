@@ -1,11 +1,15 @@
 from django.contrib import admin
-from django.apps import apps
+from .models import Venta, VentaDetalle
 
+class VentaDetalleInline(admin.TabularInline):
+    model = VentaDetalle
+    extra = 0
 
-# Auto-register all models in this app
-app_models = apps.get_app_config('ventas').get_models()
-for model in app_models:
-    try:
-        admin.site.register(model)
-    except admin.sites.AlreadyRegistered:
-        pass
+@admin.register(Venta)
+class VentaAdmin(admin.ModelAdmin):
+    list_display = ('id', 'fecha', 'total', 'metodo_pago', 'usuario', 'caja')
+    inlines = [VentaDetalleInline]
+
+@admin.register(VentaDetalle)
+class VentaDetalleAdmin(admin.ModelAdmin):
+    list_display = ('venta', 'presentacion', 'cantidad_ingresada', 'unidad_venta', 'precio_unitario', 'subtotal')
