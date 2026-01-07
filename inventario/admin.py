@@ -12,7 +12,7 @@ class CategoriaAdmin(admin.ModelAdmin):
 class ProductoAdmin(admin.ModelAdmin):
     list_display = ('codigo_barra', 'nombre', 'categoria', 'tipo_producto', 'stock_display', 'precio_venta', 'activo')
     list_filter = ('categoria', 'tipo_producto', 'activo')
-    search_fields = ('codigo_barra', 'nombre', 'categoria')
+    search_fields = ('codigo_barra', 'nombre', 'categoria__nombre')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {'fields': ('codigo_barra', 'nombre', 'categoria', 'tipo_producto', 'unidad_base', 'activo')}),

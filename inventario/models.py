@@ -18,7 +18,7 @@ class Producto(models.Model):
 
     codigo_barra = models.CharField(max_length=50, unique=True)
     nombre = models.CharField(max_length=100)
-    categoria = models.CharField(max_length=50)
+    categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT)
     tipo_producto = models.CharField(max_length=10, choices=TipoProducto.choices)
     unidad_base = models.CharField(max_length=10, choices=UnidadBase.choices)
 
@@ -44,3 +44,28 @@ class Producto(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+class Presentacion(models.Model):
+    UNIDAD_CHOICES = [
+        ('ml', 'Mililitros'),
+        ('l', 'Litros'),
+        ('g', 'Gramos'),
+        ('kg', 'Kilogramos'),
+        ('un', 'Unidad'),
+    ]
+
+    producto = models.ForeignKey(
+        Producto,
+        related_name='presentaciones',
+        on_delete=models.CASCADE
+    )
+    cantidad = models.DecimalField(max_digits=6, decimal_places=2)
+    unidad = models.CharField(max_length=5, choices=UNIDAD_CHOICES)
+
+    precio = models.DecimalField(max_digits=10, decimal_places=2)
+    stock = models.PositiveIntegerField()
+    codigo_barra = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return f"{self.producto.nombre} - {self.cantidad}{self.unidad}"
