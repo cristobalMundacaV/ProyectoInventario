@@ -12,12 +12,23 @@ def caja_list(request):
 
 @login_required
 def abrir_caja(request):
-    if Caja.objects.filter(abierta=True).exists():
-        messages.error(request, 'Ya hay una caja abierta.')
+    # Verificar si ya existe caja para hoy
+    hoy = timezone.now().date()
+    caja_existente = Caja.objects.filter(fecha=hoy).first()
+    
+    if caja_existente:
+        if caja_existente.abierta:
+            messages.error(request, 'Ya hay una caja abierta para hoy.')
+        else:
+            # Reabrir la caja existente
+            caja_existente.abierta = True
+            caja_existente.save()
+            messages.success(request, 'Caja reabierta exitosamente.')
         return redirect('caja_list')
     
+    # Crear nueva caja si no existe para hoy
     caja = Caja.objects.create(
-        fecha=timezone.now().date(),
+        fecha=hoy,
         monto_inicial=0
     )
     messages.success(request, 'Caja abierta exitosamente.')
@@ -28,7 +39,6 @@ def cerrar_caja(request):
     try:
         caja = Caja.objects.get(abierta=True)
         caja.abierta = False
-        caja.cerrada_por = request.user
         caja.save()
         messages.success(request, 'Caja cerrada exitosamente.')
     except Caja.DoesNotExist:

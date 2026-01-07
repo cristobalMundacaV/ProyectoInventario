@@ -61,28 +61,25 @@
 
                     <h5 class="mb-3">Datos de la Venta</h5>
 
+                    <!-- Información automática -->
+                    <div class="alert alert-info mb-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Usuario:</strong> {{ usuario_actual.username }}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Caja Activa:</strong> {{ caja_activa.fecha }} 
+                                <span class="badge bg-success">Abierta</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label fw-semibold">{{ vform.metodo_pago.label }}{% if vform.metodo_pago.field.required %} <span class="text-danger">*</span>{% endif %}</label>
                         {{ vform.metodo_pago }}
                         {% for error in vform.metodo_pago.errors %}
                             <div class="text-danger small">{{ error }}</div>
                         {% endfor %}
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">{{ vform.usuario.label }}{% if vform.usuario.field.required %} <span class="text-danger">*</span>{% endif %}</label>
-                            {{ vform.usuario }}
-                            {% for error in vform.usuario.errors %}
-                                <div class="text-danger small">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">{{ vform.caja.label }}{% if vform.caja.field.required %} <span class="text-danger">*</span>{% endif %}</label>
-                            {{ vform.caja }}
-                            {% for error in vform.caja.errors %}
-                                <div class="text-danger small">{{ error }}</div>
-                            {% endfor %}
-                        </div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">

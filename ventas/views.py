@@ -20,10 +20,16 @@ def venta_list(request):
 def venta_create(request):
     User = get_user_model()
     
+    # Obtener usuario actual y caja activa automáticamente
+    usuario_actual = request.user
+    caja_activa = Caja.objects.filter(abierta=True).first()
+    
+    if not caja_activa:
+        messages.error(request, 'No hay una caja abierta. Por favor, abra una caja primero.')
+        return redirect('caja_list')
+    
     metodo_choices = MetodoPago.choices
     unidad_choices = UnidadVenta.choices
-    usuarios = User.objects.all()
-    cajas = Caja.objects.all()
 
     presentaciones = Presentacion.objects.all()
     presentaciones_data = []
@@ -43,7 +49,7 @@ def venta_create(request):
             presentacion_stock_map[str(p.id)] = str(p.stock_base)
 
     if request.method == 'POST':
-        vform = VentaForm(request.POST, metodo_choices=metodo_choices, usuario_qs=usuarios, caja_qs=cajas)
+        vform = VentaForm(request.POST, metodo_choices=metodo_choices)
         dformset = VentaDetalleFormSet(request.POST, form_kwargs={'unidad_choices': unidad_choices})
 
         if vform.is_valid() and dformset.is_valid():
@@ -95,10 +101,13 @@ def venta_create(request):
                     'unidad_choices': unidad_choices,
                 })
 
-            # create venta
-            venta = vform.save(commit=False)
-            venta.total = sum(d['subtotal'] for d in detalles)
-            venta.save()
+            # create venta con usuario y caja automáticos
+            venta = Venta.objects.create(
+                metodo_pago=vform.cleaned_data['metodo_pago'],
+                usuario=usuario_actual,
+                caja=caja_activa,
+                total=sum(d['subtotal'] for d in detalles)
+            )
 
             # create venta detalles
             for detalle_data in detalles:
@@ -116,7 +125,7 @@ def venta_create(request):
             return redirect('venta_list')
 
     else:
-        vform = VentaForm(metodo_choices=metodo_choices, usuario_qs=usuarios, caja_qs=cajas)
+        vform = VentaForm(metodo_choices=metodo_choices)
         dformset = VentaDetalleFormSet(form_kwargs={'unidad_choices': unidad_choices})
 
     return render(request, 'ventas/venta_form.html', {
@@ -125,4 +134,6 @@ def venta_create(request):
         'products': presentaciones_data,
         'product_stock_map': presentacion_stock_map,
         'unidad_choices': unidad_choices,
+        'caja_activa': caja_activa,
+        'usuario_actual': usuario_actual,
     })

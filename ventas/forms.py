@@ -5,20 +5,12 @@ from inventario.models import Presentacion
 
 class VentaForm(forms.Form):
     metodo_pago = forms.ChoiceField(choices=[], widget=forms.Select(attrs={'class':'form-select'}))
-    usuario = forms.ModelChoiceField(queryset=None, widget=forms.Select(attrs={'class':'form-select'}))
-    caja = forms.ModelChoiceField(queryset=None, widget=forms.Select(attrs={'class':'form-select'}))
 
     def __init__(self, *args, **kwargs):
         metodo_choices = kwargs.pop('metodo_choices', None)
-        usuario_qs = kwargs.pop('usuario_qs', None)
-        caja_qs = kwargs.pop('caja_qs', None)
         super().__init__(*args, **kwargs)
         if metodo_choices is not None:
             self.fields['metodo_pago'].choices = metodo_choices
-        if usuario_qs is not None:
-            self.fields['usuario'].queryset = usuario_qs
-        if caja_qs is not None:
-            self.fields['caja'].queryset = caja_qs
 
 
 class VentaDetalleForm(forms.Form):

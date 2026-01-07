@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from inventario.models import Producto
 from ventas.models import Venta
 from caja.models import Caja
+from auditoria.models import Actividad
 from django.utils import timezone
 from django.db.models import Count, Sum
 
@@ -20,10 +21,14 @@ def home(request):
         # Estado de caja
         caja_abierta = Caja.objects.filter(abierta=True).exists()
         
+        # Últimas actividades
+        ultimas_actividades = Actividad.objects.select_related('usuario').order_by('-fecha_hora')[:10]
+        
         context = {
             'ventas_hoy': ventas_hoy,
             'productos_stock_bajo': productos_stock_bajo,
             'caja_abierta': caja_abierta,
+            'ultimas_actividades': ultimas_actividades,
         }
         
         return render(request, 'home.html', context)
