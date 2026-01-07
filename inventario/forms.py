@@ -55,14 +55,6 @@ class PresentacionForm(forms.ModelForm):
             'unidad_venta': forms.Select(attrs={
                 'class': 'form-select'
             }),
-            'cantidad_base': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '1'
-            }),
-            'stock_base': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '0.001'
-            }),
             'precio_compra': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'step': '0.01'
@@ -71,20 +63,34 @@ class PresentacionForm(forms.ModelForm):
                 'class': 'form-control',
                 'step': '0.01'
             }),
+            'unidades_por_pack': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '1'
+            }),
+            'kg_por_caja': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.001'
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Hacer campos condicionales según unidad_venta
+        if 'unidad_venta' in self.data:
+            unidad_venta = self.data.get('unidad_venta')
+            if unidad_venta != 'PACK':
+                self.fields['unidades_por_pack'].required = False
+            if unidad_venta != 'CAJA':
+                self.fields['kg_por_caja'].required = False
 
     def clean(self):
         cleaned = super().clean()
 
-        cantidad_base = cleaned.get('cantidad_base')
         precio_compra = cleaned.get('precio_compra')
         precio_venta = cleaned.get('precio_venta')
-
-        if cantidad_base is not None and cantidad_base <= 0:
-            self.add_error(
-                'cantidad_base',
-                'La cantidad base debe ser mayor a 0.'
-            )
+        unidad_venta = cleaned.get('unidad_venta')
+        unidades_por_pack = cleaned.get('unidades_por_pack')
+        kg_por_caja = cleaned.get('kg_por_caja')
 
         if precio_compra is not None and precio_venta is not None:
             if precio_venta < precio_compra:
@@ -93,12 +99,24 @@ class PresentacionForm(forms.ModelForm):
                     'El precio de venta no puede ser menor al precio de compra.'
                 )
 
+        # Validaciones específicas por tipo de unidad
+        if unidad_venta == 'PACK' and not unidades_por_pack:
+            self.add_error(
+                'unidades_por_pack',
+                'Este campo es requerido para productos tipo PACK.'
+            )
+
+        if unidad_venta == 'CAJA' and not kg_por_caja:
+            self.add_error(
+                'kg_por_caja',
+                'Este campo es requerido para productos tipo CAJA.'
+            )
+
         return cleaned
+
     def save(self, commit=True):
         instance = super().save(commit=False)
-        instance.margen_ganancia = (
-            instance.precio_venta - instance.precio_compra
-        )
+        # El margen_ganancia se calcula automáticamente en el método save del modelo
         if commit:
             instance.save()
-        return instance    
+        return instance

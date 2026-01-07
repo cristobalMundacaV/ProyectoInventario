@@ -9,7 +9,7 @@ def producto_list(request):
 	categoria = request.GET.get('categoria', '')
 	codigo_barra = request.GET.get('codigo_barra', '')
 
-	productos = Producto.objects.all()
+	productos = Producto.objects.all().prefetch_related('presentaciones')
 	if nombre:
 		productos = productos.filter(nombre__icontains=nombre)
 	if categoria:

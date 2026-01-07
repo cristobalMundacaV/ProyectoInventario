@@ -62,6 +62,13 @@
                                 <label class="form-label fw-semibold">Margen de ganancia</label>
                                 <input type="text" id="margen-preview" class="form-control bg-light" readonly>
                             </div>
+                            
+                            <!-- Cálculo de kilogramos -->
+                            <div id="calculo-kg" class="mb-3" style="display: none;">
+                                <label class="form-label fw-semibold">Precio por KG</label>
+                                <input type="text" id="kg-preview" class="form-control bg-light" readonly>
+                                <small class="form-text text-muted">Precio por kilogramo: precio_compra ÷ kg_por_caja</small>
+                            </div>
                         </div>
                     </div>
 
@@ -80,6 +87,12 @@
                     const compra = document.getElementById('id_precio_compra');
                     const venta = document.getElementById('id_precio_venta');
                     const margen = document.getElementById('margen-preview');
+                    const unidadVenta = document.getElementById('id_unidad_venta');
+                    const camposPack = document.getElementById('campos-pack');
+                    const camposCaja = document.getElementById('campos-caja');
+                    const kgPorCaja = document.getElementById('id_kg_por_caja');
+                    const calculoKg = document.getElementById('calculo-kg');
+                    const kgPreview = document.getElementById('kg-preview');
 
                     function calcularMargen() {
                         const pc = parseFloat(compra.value.replace(',', '.')) || 0;
@@ -87,8 +100,50 @@
                         margen.value = (pv - pc).toFixed(2);
                     }
 
-                    compra.addEventListener('input', calcularMargen);
+                    function calcularPrecioPorKg() {
+                        const pc = parseFloat(compra.value.replace(',', '.')) || 0;
+                        const kg = parseFloat(kgPorCaja.value.replace(',', '.')) || 0;
+                        
+                        if (kg > 0) {
+                            kgPreview.value = (pc / kg).toFixed(2);
+                        } else {
+                            kgPreview.value = '';
+                        }
+                    }
+
+                    function toggleCampos() {
+                        const unidad = unidadVenta.value;
+                        
+                        // Ocultar todos los campos condicionales
+                        camposPack.style.display = 'none';
+                        camposCaja.style.display = 'none';
+                        calculoKg.style.display = 'none';
+                        
+                        // Mostrar campos según la unidad seleccionada
+                        if (unidad === 'PACK') {
+                            camposPack.style.display = 'block';
+                        } else if (unidad === 'CAJA') {
+                            camposCaja.style.display = 'block';
+                            calculoKg.style.display = 'block';
+                            calcularPrecioPorKg(); // Calcular al mostrar
+                        }
+                    }
+
+                    // Event listeners
+                    compra.addEventListener('input', function() {
+                        calcularMargen();
+                        calcularPrecioPorKg();
+                    });
+                    
                     venta.addEventListener('input', calcularMargen);
+                    
+                    unidadVenta.addEventListener('change', toggleCampos);
+                    
+                    kgPorCaja.addEventListener('input', calcularPrecioPorKg);
+                    
+                    // Inicializar
+                    toggleCampos();
+                    calcularMargen();
                 });
                 </script>
 

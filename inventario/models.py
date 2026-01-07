@@ -75,12 +75,6 @@ class Presentacion(models.Model):
         choices=UNIDAD_VENTA_CHOICES
     )
 
-    # Conversión → NO es stock
-    cantidad_base = models.DecimalField(
-        max_digits=10,
-        decimal_places=3
-    )
-
     precio_compra = models.DecimalField(max_digits=10, decimal_places=2)
     precio_venta = models.DecimalField(max_digits=10, decimal_places=2)
     margen_ganancia = models.DecimalField(
@@ -90,12 +84,74 @@ class Presentacion(models.Model):
         default=0
     )
 
+    unidades_por_pack = models.IntegerField(blank=True, null=True)
+    kg_por_caja = models.DecimalField(max_digits=10, decimal_places=3, blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     @property
     def activo(self):
         return self.producto.stock_actual_base > 0
+
+    @property
+    def stock_minimo_display(self):
+        if self.producto.tipo_producto == 'GRANEL':
+            return str(self.producto.stock_minimo or 0)
+        return str(int(self.producto.stock_minimo or 0))
+
+    @property
+    def stock_base_display(self):
+        if self.producto.tipo_producto == 'GRANEL':
+            return str(self.producto.stock_actual_base or 0)
+        return str(int(self.producto.stock_actual_base or 0))
+
+    @property
+    def stock_display(self):
+        if self.producto.tipo_producto == 'GRANEL':
+            return self.producto.stock_actual_base
+        return int(self.producto.stock_actual_base)
+
+    @property
+    def margen_display(self):
+        if self.unidad_venta == 'PACK' and self.unidades_por_pack:
+            try:
+                return str(round(float(self.precio_venta) - float(self.precio_unitario_pack), 2))
+            except (ZeroDivisionError, TypeError):
+                return ""
+        elif self.unidad_venta == 'CAJA' and self.kg_por_caja:
+            try:
+                # MARGEN POR KG: precio_venta - (precio_compra / kg_por_caja)
+                return str(round(float(self.precio_venta) - (float(self.precio_compra) / float(self.kg_por_caja)), 2))
+            except (ZeroDivisionError, TypeError):
+                return ""
+        else:
+            return str(round(float(self.precio_venta) - float(self.precio_compra), 2))
+
+    @property
+    def precio_unitario_pack(self):
+        if self.unidad_venta == 'PACK' and self.unidades_por_pack:
+            try:
+                return round(float(self.precio_compra) / self.unidades_por_pack, 2)
+            except (ZeroDivisionError, TypeError):
+                return 0
+        return None
+
+    def save(self, *args, **kwargs):
+        if self.unidad_venta == 'PACK' and self.unidades_por_pack:
+            try:
+                self.margen_ganancia = round(float(self.precio_venta) - (float(self.precio_compra) / self.unidades_por_pack), 2)
+            except (ZeroDivisionError, TypeError):
+                self.margen_ganancia = 0
+        elif self.unidad_venta == 'CAJA' and self.kg_por_caja:
+            try:
+                # MARGEN POR KG: precio_venta - (precio_compra / kg_por_caja)
+                self.margen_ganancia = round(float(self.precio_venta) - (float(self.precio_compra) / float(self.kg_por_caja)), 2)
+            except (ZeroDivisionError, TypeError):
+                self.margen_ganancia = 0
+        else:
+            self.margen_ganancia = round(float(self.precio_venta) - float(self.precio_compra), 2)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.producto.nombre} - {self.nombre}"
@@ -110,7 +166,6 @@ class IngresoStock(models.Model):
 
     def __str__(self):
         return f"Ingreso {self.id} - {self.fecha.date()}"
-
 
 class IngresoStockDetalle(models.Model):
     ingreso = models.ForeignKey(

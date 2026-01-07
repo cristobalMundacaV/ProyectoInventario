@@ -62,8 +62,8 @@ class PresentacionAdmin(admin.ModelAdmin):
         'nombre',
         'codigo_barra',
         'unidad_venta',
-        'cantidad_base',
         'precio_venta',
+        'margen_ganancia',
         'activo',
     )
     def activo(self, obj):
@@ -82,7 +82,7 @@ class PresentacionAdmin(admin.ModelAdmin):
             'fields': ('producto', 'nombre', 'codigo_barra')
         }),
         ('Configuración de Venta', {
-            'fields': ('unidad_venta', 'cantidad_base')
+            'fields': ('unidad_venta',)
         }),
         ('Precios', {
             'fields': (

@@ -49,21 +49,23 @@
                 </thead>
                 <tbody>
                     {% for producto in productos %}
+                    {% with presentacion=producto.presentaciones.first %}
                     <tr>
-                      <td>{{ producto.codigo_barra }}</td>
+                      <td>{{ presentacion.codigo_barra|default:"-" }}</td>
                       <td class="fw-semibold">{{ producto.nombre }}</td>
                       <td>{{ producto.categoria }}</td>
                       <td>{{ producto.get_tipo_producto_display }}</td>
-                      <td>{{ producto.stock_minimo_display }}</td>
-                      <td><span class="badge bg-info text-dark">{{ producto.stock_base_display }}</span></td>
-                      <td><span class="badge bg-warning text-dark">${{ producto.precio_compra }}</span></td>
-                      <td><span class="badge bg-success">${{ producto.precio_venta }}</span></td>
-                      <td><span class="badge bg-secondary">${{ producto.margen_ganancia }}</span></td>
+                      <td>{{ presentacion.stock_minimo_display|default:"-" }}</td>
+                      <td><span class="badge bg-info text-dark">{{ presentacion.stock_base_display|default:"0" }}</span></td>
+                      <td><span class="badge bg-warning text-dark">${{ presentacion.precio_compra|default:"-" }}</span></td>
+                      <td><span class="badge bg-success">${{ presentacion.precio_venta|default:"-" }}</span></td>
+                      <td><span class="badge bg-secondary">${{ presentacion.margen_display|default:"-" }}</span></td>
                       <td class="text-center">
                         <a href="{% url 'producto_update' producto.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
                         <a href="{% url 'producto_delete' producto.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="bi bi-trash"></i></a>
                       </td>
                     </tr>
+                    {% endwith %}
                     {% empty %}
                     <tr><td colspan="9" class="text-center text-muted">No hay productos.</td></tr>
                     {% endfor %}
