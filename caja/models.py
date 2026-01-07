@@ -1,8 +1,10 @@
+
 from django.db import models
 
 
 class Caja(models.Model):
     fecha = models.DateField(unique=True)
+
     monto_inicial = models.DecimalField(max_digits=10, decimal_places=2)
 
     total_vendido = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -13,6 +15,9 @@ class Caja(models.Model):
     ganancia_diaria = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     abierta = models.BooleanField(default=True)
+
+    hora_apertura = models.DateTimeField()
+    hora_cierre = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Caja {self.fecha}"
