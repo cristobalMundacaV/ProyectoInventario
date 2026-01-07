@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Panel Principal{% endblock %}
+
+{% block contenido %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Tarjeta de Ventas -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-currency-dollar"></i>
+                        Módulo de Ventas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'venta_create' %}" class="btn btn-success btn-lg">
+                                    <i class="bi bi-plus-circle"></i>
+                                    Nueva Venta
+                                </a>
+                                <a href="{% url 'venta_list' %}" class="btn btn-info btn-lg">
+                                    <i class="bi bi-list"></i>
+                                    Ver Ventas
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-center">
+                                <h6 class="text-muted">Ventas del Día</h6>
+                                <h3 class="text-primary">{{ ventas_hoy|default:0 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Lateral -->
+        <div class="col-lg-4">
+            <!-- Inventario -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-box"></i>
+                        Inventario
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'producto_list' %}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-box-seam"></i>
+                            Productos
+                        </a>
+                        <a href="{% url 'producto_create' %}" class="btn btn-success w-100">
+                            <i class="bi bi-plus"></i>
+                            Nuevo Producto
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Caja -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-cash-stack"></i>
+                        Caja
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'caja_list' %}" class="btn btn-outline-warning w-100">
+                            <i class="bi bi-cash"></i>
+                            Ver Cajas
+                        </a>
+                        {% if caja_abierta %}
+                        <a href="{% url 'cerrar_caja' %}" class="btn btn-danger w-100">
+                            <i class="bi bi-lock"></i>
+                            Cerrar Caja
+                        </a>
+                        {% else %}
+                        <a href="{% url 'abrir_caja' %}" class="btn btn-warning w-100">
+                            <i class="bi bi-unlock"></i>
+                            Abrir Caja
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auditoría -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clock-history"></i>
+                        Auditoría
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'auditoria_list' %}" class="btn btn-outline-info w-100">
+                        <i class="bi bi-journal-text"></i>
+                        Ver Actividades
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Lista de Cajas{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Gestión de Cajas</h4>
+                    <div>
+                        {% if not cajas_abiertas %}
+                        <a href="{% url 'abrir_caja' %}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Abrir Caja
+                        </a>
+                        {% else %}
+                        <a href="{% url 'cerrar_caja' %}" class="btn btn-danger">
+                            <i class="fas fa-lock"></i> Cerrar Caja
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if cajas %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th>Total Vendido</th>
+                                    <th>Efectivo</th>
+                                    <th>Débito</th>
+                                    <th>Transferencia</th>
+                                    <th>Ganancia</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for caja in cajas %}
+                                <tr>
+                                    <td>{{ caja.fecha }}</td>
+                                    <td>
+                                        {% if caja.abierta %}
+                                        <span class="badge bg-success">Abierta</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Cerrada</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>${{ caja.total_vendido }}</td>
+                                    <td>${{ caja.total_efectivo }}</td>
+                                    <td>${{ caja.total_debito }}</td>
+                                    <td>${{ caja.total_transferencia }}</td>
+                                    <td>${{ caja.ganancia_diaria }}</td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        No hay cajas registradas. 
+                        {% if not cajas_abiertas %}
+                        <a href="{% url 'abrir_caja' %}" class="alert-link">Abrir nueva caja</a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

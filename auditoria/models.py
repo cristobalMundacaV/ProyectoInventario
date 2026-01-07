@@ -1,13 +1,27 @@
 from django.db import models
-from core.enums import TipoAccion
-from usuarios.models import Usuario
 
 
 class Actividad(models.Model):
+
+    TIPO_ACCION_CHOICES = [
+        ('APERTURA_CAJA', 'Apertura de Caja'),
+        ('CIERRE_CAJA', 'Cierre de Caja'),
+        ('VENTA', 'Venta'),
+        ('INGRESO_STOCK', 'Ingreso de Stock'),
+        ('CREACION_PRODUCTO', 'Creación de Producto'),
+        ('EDICION_PRODUCTO', 'Edición de Producto'),
+    ]
+
     fecha_hora = models.DateTimeField(auto_now_add=True)
-    usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT)
-    tipo_accion = models.CharField(max_length=20, choices=TipoAccion.choices)
+    usuario = models.ForeignKey(
+        'auth.User',
+        on_delete=models.PROTECT
+    )
+    tipo_accion = models.CharField(
+        max_length=30,
+        choices=TIPO_ACCION_CHOICES
+    )
     descripcion = models.CharField(max_length=255)
 
-    class Meta:
-        verbose_name_plural = 'Actividades'
+    def __str__(self):
+        return f"{self.tipo_accion} - {self.fecha_hora}"

@@ -12,4 +12,4 @@ class VentaAdmin(admin.ModelAdmin):
 
 @admin.register(VentaDetalle)
 class VentaDetalleAdmin(admin.ModelAdmin):
-    list_display = ('venta', 'producto', 'cantidad_ingresada', 'unidad_venta', 'cantidad_base', 'precio_unitario', 'subtotal')
+    list_display = ('venta', 'presentacion', 'cantidad_ingresada', 'unidad_venta', 'precio_unitario', 'subtotal')
