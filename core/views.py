@@ -19,7 +19,8 @@ def home(request):
         productos_stock_bajo = Producto.objects.filter(stock_minimo__gt=0).count()
         
         # Estado de caja
-        caja_abierta = Caja.objects.filter(abierta=True).exists()
+        cajas_abiertas_count = Caja.objects.filter(abierta=True).count()
+        caja_abierta = cajas_abiertas_count > 0
         
         # Últimas actividades
         ultimas_actividades = Actividad.objects.select_related('usuario').order_by('-fecha_hora')[:10]
@@ -28,6 +29,7 @@ def home(request):
             'ventas_hoy': ventas_hoy,
             'productos_stock_bajo': productos_stock_bajo,
             'caja_abierta': caja_abierta,
+            'cajas_abiertas_count': cajas_abiertas_count,
             'ultimas_actividades': ultimas_actividades,
         }
         

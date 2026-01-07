@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Apertura de Caja{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-cash-stack"></i> Apertura de Caja
+                </h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Ingrese el monto inicial con el que comenzará la caja hoy.</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.monto_inicial.id_for_label }}" class="form-label">
+                            <i class="bi bi-currency-dollar"></i> {{ form.monto_inicial.label }}
+                        </label>
+                        {{ form.monto_inicial }}
+                        {% if form.monto_inicial.errors %}
+                            <div class="text-danger">
+                                {% for error in form.monto_inicial.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'home' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Abrir Caja
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

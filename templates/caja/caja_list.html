@@ -29,6 +29,11 @@
                                 <tr>
                                     <th>Fecha</th>
                                     <th>Estado</th>
+                                    <th>Monto Inicial</th>
+                                    <th>Hora Apertura</th>
+                                    <th>Abierta por</th>
+                                    <th>Hora Cierre</th>
+                                    <th>Cerrada por</th>
                                     <th>Total Vendido</th>
                                     <th>Efectivo</th>
                                     <th>Débito</th>
@@ -46,6 +51,29 @@
                                         <span class="badge bg-success">Abierta</span>
                                         {% else %}
                                         <span class="badge bg-danger">Cerrada</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>${{ caja.monto_inicial }}</td>
+                                    <td>{{ caja.hora_apertura|date:"H:i" }}</td>
+                                    <td>
+                                        {% if caja.abierta_por %}
+                                            {{ caja.abierta_por.username }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if caja.hora_cierre %}
+                                            {{ caja.hora_cierre|date:"H:i" }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if caja.cerrada_por %}
+                                            {{ caja.cerrada_por.username }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
                                     <td>${{ caja.total_vendido }}</td>
