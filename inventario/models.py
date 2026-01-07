@@ -81,11 +81,11 @@ class Presentacion(models.Model):
 
     precio_compra = models.DecimalField(max_digits=10, decimal_places=2)
     precio_venta = models.DecimalField(max_digits=10, decimal_places=2)
-    margen_ganancia = models.DecimalField(max_digits=5, decimal_places=2)
+    margen_ganancia = models.DecimalField(max_digits=10, decimal_places=2, editable=False, default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    activo = models.BooleanField(default=True)
+
 
     @property
     def activo_property(self):

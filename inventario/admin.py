@@ -64,6 +64,8 @@ class PresentacionAdmin(admin.ModelAdmin):
         'precio_venta',
         'activo',
     )
+    def activo(self, obj):
+        return obj.stock_base > 0
     list_filter = ('unidad_venta', 'producto__categoria')
     search_fields = (
         'nombre',

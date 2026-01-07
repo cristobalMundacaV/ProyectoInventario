@@ -55,10 +55,10 @@
                       <td>{{ producto.categoria }}</td>
                       <td>{{ producto.get_tipo_producto_display }}</td>
                       <td>{{ producto.stock_minimo_display }}</td>
-                      <td><span class="badge bg-info text-dark">{{ producto.stock_display }}</span></td>
+                      <td><span class="badge bg-info text-dark">{{ producto.stock_base_display }}</span></td>
                       <td><span class="badge bg-warning text-dark">${{ producto.precio_compra }}</span></td>
                       <td><span class="badge bg-success">${{ producto.precio_venta }}</span></td>
-                      <td><span class="badge bg-secondary">${{ producto.precio_venta|floatformat:2|add:"-"|add:producto.precio_compra|floatformat:2 }}</span></td>
+                      <td><span class="badge bg-secondary">${{ producto.margen_ganancia }}</span></td>
                       <td class="text-center">
                         <a href="{% url 'producto_update' producto.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
                         <a href="{% url 'producto_delete' producto.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="bi bi-trash"></i></a>
