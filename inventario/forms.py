@@ -10,6 +10,7 @@ class ProductoForm(forms.ModelForm):
             'categoria',
             'tipo_producto',
             'unidad_base',
+            'stock_actual_base',
             'stock_minimo',
         ]
 
@@ -25,6 +26,10 @@ class ProductoForm(forms.ModelForm):
             }),
             'unidad_base': forms.Select(attrs={
                 'class': 'form-select'
+            }),
+            'stock_actual_base': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.001'
             }),
             'stock_minimo': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -52,7 +57,7 @@ class PresentacionForm(forms.ModelForm):
             }),
             'cantidad_base': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'step': '0.001'
+                'step': '1'
             }),
             'stock_base': forms.NumberInput(attrs={
                 'class': 'form-control',

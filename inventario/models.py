@@ -36,7 +36,14 @@ class Producto(models.Model):
         max_length=10,
         choices=UNIDAD_BASE_CHOICES
     )
-    stock_minimo = models.DecimalField(max_digits=10, decimal_places=3)
+
+    stock_actual_base = models.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        default=0
+    )
+
+    stock_minimo = models.DecimalField(max_digits=10, decimal_places=3, default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -68,32 +75,30 @@ class Presentacion(models.Model):
         choices=UNIDAD_VENTA_CHOICES
     )
 
+    # Conversión → NO es stock
     cantidad_base = models.DecimalField(
         max_digits=10,
         decimal_places=3
     )
 
-    stock_base = models.DecimalField(
-        max_digits=10,
-        decimal_places=3,
-        default=0
-    )
-
     precio_compra = models.DecimalField(max_digits=10, decimal_places=2)
     precio_venta = models.DecimalField(max_digits=10, decimal_places=2)
-    margen_ganancia = models.DecimalField(max_digits=10, decimal_places=2, editable=False, default=0)
+    margen_ganancia = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        editable=False,
+        default=0
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-
     @property
-    def activo_property(self):
-        return self.stock_base > 0
+    def activo(self):
+        return self.producto.stock_actual_base > 0
 
     def __str__(self):
         return f"{self.producto.nombre} - {self.nombre}"
-
 
 class IngresoStock(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
@@ -117,7 +122,10 @@ class IngresoStockDetalle(models.Model):
         Presentacion,
         on_delete=models.PROTECT
     )
-    cantidad_base = models.DecimalField(max_digits=10, decimal_places=3)
+    cantidad_base = models.DecimalField(
+        max_digits=10,
+        decimal_places=3
+    )
 
     def __str__(self):
         return f"{self.presentacion} +{self.cantidad_base}"

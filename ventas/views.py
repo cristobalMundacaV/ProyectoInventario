@@ -36,7 +36,7 @@ def venta_create(request):
     presentacion_stock_map = {}
     
     for p in presentaciones:
-        if p.stock_base > 0:  # Solo presentaciones con stock
+        if p.producto.stock_actual_base > 0:  # Solo presentaciones con stock
             presentaciones_data.append({
                 'id': p.id,
                 'codigo_barra': p.codigo_barra,
@@ -46,7 +46,7 @@ def venta_create(request):
                 'cantidad': float(p.cantidad_base),
                 'unidad': p.unidad_venta
             })
-            presentacion_stock_map[str(p.id)] = str(p.stock_base)
+            presentacion_stock_map[str(p.id)] = str(p.producto.stock_actual_base)
 
     if request.method == 'POST':
         vform = VentaForm(request.POST, metodo_choices=metodo_choices)
@@ -109,7 +109,7 @@ def venta_create(request):
                 total=sum(d['subtotal'] for d in detalles)
             )
 
-            # create venta detalles
+            # create venta detalles y actualizar stock
             for detalle_data in detalles:
                 VentaDetalle.objects.create(
                     venta=venta,
@@ -120,6 +120,11 @@ def venta_create(request):
                     precio_unitario=detalle_data['precio_unitario'],
                     subtotal=detalle_data['subtotal']
                 )
+                
+                # Descontar stock del producto
+                producto = detalle_data['presentacion'].producto
+                producto.stock_actual_base -= detalle_data['cantidad_base']
+                producto.save()
 
             messages.success(request, 'Venta creada exitosamente.')
             return redirect('venta_list')

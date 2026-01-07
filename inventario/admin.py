@@ -28,6 +28,7 @@ class ProductoAdmin(admin.ModelAdmin):
         'categoria',
         'tipo_producto',
         'unidad_base',
+        'stock_actual_base',
         'stock_minimo',
     )
     list_filter = ('categoria', 'tipo_producto', 'unidad_base')
@@ -41,6 +42,7 @@ class ProductoAdmin(admin.ModelAdmin):
                 'categoria',
                 'tipo_producto',
                 'unidad_base',
+                'stock_actual_base',
                 'stock_minimo',
             )
         }),
@@ -60,19 +62,20 @@ class PresentacionAdmin(admin.ModelAdmin):
         'nombre',
         'codigo_barra',
         'unidad_venta',
-        'stock_base',
+        'cantidad_base',
         'precio_venta',
         'activo',
     )
     def activo(self, obj):
-        return obj.stock_base > 0
+        return obj.producto.stock_actual_base > 0
+    activo.boolean = True
     list_filter = ('unidad_venta', 'producto__categoria')
     search_fields = (
         'nombre',
         'codigo_barra',
         'producto__nombre',
     )
-    readonly_fields = ('created_at', 'updated_at', 'activo_property')
+    readonly_fields = ('created_at', 'updated_at', 'activo')
 
     fieldsets = (
         ('Producto', {
@@ -81,9 +84,8 @@ class PresentacionAdmin(admin.ModelAdmin):
         ('Configuración de Venta', {
             'fields': ('unidad_venta', 'cantidad_base')
         }),
-        ('Stock y Precios', {
+        ('Precios', {
             'fields': (
-                'stock_base',
                 'precio_compra',
                 'precio_venta',
                 'margen_ganancia',
