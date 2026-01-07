@@ -22,25 +22,33 @@ def abrir_caja(request):
         else:
             # Reabrir la caja existente
             caja_existente.abierta = True
+            caja_existente.hora_apertura = timezone.now()
             caja_existente.save()
             messages.success(request, 'Caja reabierta exitosamente.')
-        return redirect('caja_list')
+    else:
+        # Crear nueva caja si no existe para hoy
+        caja = Caja.objects.create(
+            fecha=hoy,
+            monto_inicial=0,
+            hora_apertura=timezone.now()
+        )
+        messages.success(request, 'Caja abierta exitosamente.')
     
-    # Crear nueva caja si no existe para hoy
-    caja = Caja.objects.create(
-        fecha=hoy,
-        monto_inicial=0
-    )
-    messages.success(request, 'Caja abierta exitosamente.')
-    return redirect('caja_list')
+    # Redirigir al home si viene desde allí, sino a caja_list
+    next_url = request.GET.get('next', 'home')
+    return redirect(next_url)
 
 @login_required
 def cerrar_caja(request):
     try:
         caja = Caja.objects.get(abierta=True)
         caja.abierta = False
+        caja.hora_cierre = timezone.now()
         caja.save()
         messages.success(request, 'Caja cerrada exitosamente.')
     except Caja.DoesNotExist:
         messages.error(request, 'No hay una caja abierta para cerrar.')
-    return redirect('caja_list')
+    
+    # Redirigir al home si viene desde allí, sino a caja_list
+    next_url = request.GET.get('next', 'caja_list')
+    return redirect(next_url)
