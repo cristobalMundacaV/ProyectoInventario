@@ -1,5 +1,5 @@
 from django.db import models
-from inventario.models import Presentacion
+from inventario.models import Producto
 from caja.models import Caja
 
 
@@ -37,9 +37,11 @@ class VentaDetalle(models.Model):
         on_delete=models.CASCADE,
         related_name='detalles'
     )
-    presentacion = models.ForeignKey(
-        Presentacion,
-        on_delete=models.PROTECT
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
     )
     cantidad_ingresada = models.DecimalField(max_digits=10, decimal_places=3)
     unidad_venta = models.CharField(max_length=10)
@@ -48,4 +50,4 @@ class VentaDetalle(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
-        return f"{self.presentacion} x {self.cantidad_ingresada}"
+        return f"{self.producto} x {self.cantidad_ingresada}"

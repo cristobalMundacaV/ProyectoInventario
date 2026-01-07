@@ -1,7 +1,7 @@
 from django import forms
 from django.forms import formset_factory
 from .models import VentaDetalle
-from inventario.models import Presentacion
+from inventario.models import Producto
 
 class VentaForm(forms.Form):
     metodo_pago = forms.ChoiceField(choices=[], widget=forms.Select(attrs={'class':'form-select'}))
@@ -14,7 +14,7 @@ class VentaForm(forms.Form):
 
 
 class VentaDetalleForm(forms.Form):
-    producto = forms.ModelChoiceField(queryset=Presentacion.objects.all(), widget=forms.Select(attrs={'class':'form-select'}) )
+    producto = forms.ModelChoiceField(queryset=Producto.objects.all(), widget=forms.Select(attrs={'class':'form-select'}) )
     unidad_venta = forms.ChoiceField(choices=[], widget=forms.Select(attrs={'class':'form-select'}))
     cantidad_ingresada = forms.DecimalField(widget=forms.NumberInput(attrs={'class':'form-control', 'step':'0.001'}), max_digits=10, decimal_places=3)
 

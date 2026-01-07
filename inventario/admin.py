@@ -2,7 +2,6 @@ from django.contrib import admin
 from .models import (
     Categoria,
     Producto,
-    Presentacion,
     IngresoStock,
     IngresoStockDetalle
 )
@@ -24,75 +23,41 @@ class CategoriaAdmin(admin.ModelAdmin):
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
     list_display = (
+        'codigo_barra',
         'nombre',
         'categoria',
         'tipo_producto',
         'unidad_base',
         'stock_actual_base',
         'stock_minimo',
+        'precio_compra',
+        'precio_venta',
+        'margen_ganancia',
+        'activo',
     )
     list_filter = ('categoria', 'tipo_producto', 'unidad_base')
-    search_fields = ('nombre', 'categoria__nombre')
+    search_fields = ('nombre', 'categoria__nombre', 'codigo_barra')
     readonly_fields = ('created_at', 'updated_at')
 
     fieldsets = (
         ('Información del Producto', {
             'fields': (
+                'codigo_barra',
                 'nombre',
                 'categoria',
                 'tipo_producto',
                 'unidad_base',
                 'stock_actual_base',
                 'stock_minimo',
+                'precio_compra',
+                'precio_venta',
+                'unidades_por_pack',
+                'kg_por_caja',
+                'activo',
             )
         }),
         ('Auditoría', {
             'fields': ('created_at', 'updated_at'),
-        }),
-    )
-
-
-# =========================
-# PRESENTACION
-# =========================
-@admin.register(Presentacion)
-class PresentacionAdmin(admin.ModelAdmin):
-    list_display = (
-        'producto',
-        'nombre',
-        'codigo_barra',
-        'unidad_venta',
-        'precio_venta',
-        'margen_ganancia',
-        'activo',
-    )
-    def activo(self, obj):
-        return obj.producto.stock_actual_base > 0
-    activo.boolean = True
-    list_filter = ('unidad_venta', 'producto__categoria')
-    search_fields = (
-        'nombre',
-        'codigo_barra',
-        'producto__nombre',
-    )
-    readonly_fields = ('created_at', 'updated_at', 'activo')
-
-    fieldsets = (
-        ('Producto', {
-            'fields': ('producto', 'nombre', 'codigo_barra')
-        }),
-        ('Configuración de Venta', {
-            'fields': ('unidad_venta',)
-        }),
-        ('Precios', {
-            'fields': (
-                'precio_compra',
-                'precio_venta',
-                'margen_ganancia',
-            )
-        }),
-        ('Auditoría', {
-            'fields': ('created_at', 'updated_at', 'activo'),
         }),
     )
 
@@ -118,5 +83,5 @@ class IngresoStockAdmin(admin.ModelAdmin):
 # =========================
 @admin.register(IngresoStockDetalle)
 class IngresoStockDetalleAdmin(admin.ModelAdmin):
-    list_display = ('ingreso', 'presentacion', 'cantidad_base')
-    search_fields = ('presentacion__nombre', 'presentacion__codigo_barra')
+    list_display = ('ingreso', 'producto', 'cantidad_base')
+    search_fields = ('producto__nombre', 'producto__codigo_barra')

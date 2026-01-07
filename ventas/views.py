@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 
 from core.enums import MetodoPago, UnidadVenta
 from caja.models import Caja
-from inventario.models import Presentacion
+from inventario.models import Producto
 from .models import Venta, VentaDetalle
 from .forms import VentaForm, VentaDetalleFormSet
 
@@ -31,51 +31,59 @@ def venta_create(request):
     metodo_choices = MetodoPago.choices
     unidad_choices = UnidadVenta.choices
 
-    presentaciones = Presentacion.objects.all()
-    presentaciones_data = []
-    presentacion_stock_map = {}
+    productos = Producto.objects.all()
+    products_data = []
+    product_stock_map = {}
     
-    for p in presentaciones:
-        if p.producto.stock_actual_base > 0:  # Solo presentaciones con stock
-            presentaciones_data.append({
+    for p in productos:
+        if p.stock_actual_base > 0:
+            # compute cantidad depending on unidad_base
+            if p.tipo_producto == 'PACK' and p.unidades_por_pack:
+                cantidad = float(p.unidades_por_pack)
+            elif p.tipo_producto == 'GRANEL' and p.kg_por_caja:
+                cantidad = float(p.kg_por_caja)
+            else:
+                cantidad = 1.0
+
+            products_data.append({
                 'id': p.id,
                 'codigo_barra': p.codigo_barra,
-                'nombre': f"{p.producto.nombre} - {p.nombre}",
+                'nombre': p.nombre,
                 'precio': float(p.precio_venta),
-                'producto_nombre': p.producto.nombre,
-                'cantidad': float(p.cantidad_base),
-                'unidad': p.unidad_venta
+                'producto_nombre': p.nombre,
+                'cantidad': cantidad,
+                'unidad': p.unidad_base
             })
-            presentacion_stock_map[str(p.id)] = str(p.producto.stock_actual_base)
+            product_stock_map[str(p.id)] = str(p.stock_actual_base)
 
     if request.method == 'POST':
         vform = VentaForm(request.POST, metodo_choices=metodo_choices)
         dformset = VentaDetalleFormSet(request.POST, form_kwargs={'unidad_choices': unidad_choices})
 
         if vform.is_valid() and dformset.is_valid():
-            # aggregate required stock per presentacion
+            # aggregate required stock per producto
             required = {}
             detalles = []
             for form in dformset:
                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
-                    presentacion = form.cleaned_data['presentacion']
+                    producto = form.cleaned_data['producto']
                     unidad_venta = form.cleaned_data['unidad_venta']
                     cantidad_ingresada = form.cleaned_data['cantidad_ingresada']
 
                     # compute cantidad_base (simplificado)
                     cantidad_base = cantidad_ingresada
 
-                    # accumulate per presentacion
-                    required.setdefault(presentacion.id, Decimal('0'))
-                    required[presentacion.id] += cantidad_base
+                    # accumulate per producto
+                    required.setdefault(producto.id, Decimal('0'))
+                    required[producto.id] += cantidad_base
 
                     # compute precio_unitario
-                    precio_unitario = presentacion.precio_venta
+                    precio_unitario = producto.precio_venta
 
                     subtotal = (precio_unitario * cantidad_ingresada).quantize(Decimal('0.01'))
 
                     detalles.append({
-                        'presentacion': presentacion,
+                        'producto': producto,
                         'unidad_venta': unidad_venta,
                         'cantidad_ingresada': cantidad_ingresada,
                         'cantidad_base': cantidad_base,
@@ -85,19 +93,19 @@ def venta_create(request):
 
             # check stock availability
             stock_insuficiente = False
-            for presentacion_id, required_qty in required.items():
-                available_stock = presentacion_stock_map.get(str(presentacion_id), '0')
+            for producto_id, required_qty in required.items():
+                available_stock = product_stock_map.get(str(producto_id), '0')
                 if Decimal(required_qty) > Decimal(available_stock):
                     stock_insuficiente = True
                     break
 
             if stock_insuficiente:
-                messages.error(request, 'Stock insuficiente para algunas presentaciones.')
+                messages.error(request, 'Stock insuficiente para algunos productos.')
                 return render(request, 'ventas/venta_form.html', {
                     'vform': vform,
                     'dformset': dformset,
-                    'products': presentaciones_data,
-                    'product_stock_map': presentacion_stock_map,
+                    'products': products_data,
+                    'product_stock_map': product_stock_map,
                     'unidad_choices': unidad_choices,
                 })
 
@@ -113,7 +121,7 @@ def venta_create(request):
             for detalle_data in detalles:
                 VentaDetalle.objects.create(
                     venta=venta,
-                    presentacion=detalle_data['presentacion'],
+                    producto=detalle_data['producto'],
                     unidad_venta=detalle_data['unidad_venta'],
                     cantidad_ingresada=detalle_data['cantidad_ingresada'],
                     cantidad_base=detalle_data['cantidad_base'],
@@ -122,7 +130,7 @@ def venta_create(request):
                 )
                 
                 # Descontar stock del producto
-                producto = detalle_data['presentacion'].producto
+                producto = detalle_data['producto']
                 producto.stock_actual_base -= detalle_data['cantidad_base']
                 producto.save()
 
@@ -136,8 +144,8 @@ def venta_create(request):
     return render(request, 'ventas/venta_form.html', {
         'vform': vform,
         'dformset': dformset,
-        'products': presentaciones_data,
-        'product_stock_map': presentacion_stock_map,
+        'products': products_data,
+        'product_stock_map': product_stock_map,
         'unidad_choices': unidad_choices,
         'caja_activa': caja_activa,
         'usuario_actual': usuario_actual,
