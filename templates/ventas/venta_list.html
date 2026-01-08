@@ -7,8 +7,53 @@
         <i class="bi bi-currency-dollar me-3 d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle" style="width:40px;height:40px;font-size:20px;"></i>
         Ventas
     </h2>
-    <a href="{% url 'venta_create' %}" class="btn btn-success shadow"><i class="bi bi-plus-circle"></i> Nueva Venta</a>
+    <div>
+    <button type="button" id="btnFilter" class="btn btn-outline-primary btn-new-product me-2"><i class="bi bi-funnel-fill me-1"></i> Filtrar</button>
+      <a href="{% url 'venta_create' %}" class="btn btn-success shadow btn-new-product"><i class="bi bi-plus-circle"></i> Nueva Venta</a>
+    </div>
 </div>
+<!-- Filtros: fecha desde/hasta, método y usuario -->
+<form id="filterForm" method="get" class="mb-4">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label mb-1">Desde</label>
+            <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label mb-1">Hasta</label>
+            <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label mb-1">Método</label>
+            <select name="metodo" class="form-control">
+                <option value="">Todos</option>
+                {% for val,label in metodo_choices %}
+                    <option value="{{ val }}" {% if filtros.metodo == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label mb-1">Usuario</label>
+            <select name="usuario" class="form-control">
+                <option value="">Todos</option>
+                {% for u in usuarios %}
+                    <option value="{{ u.id }}" {% if filtros.usuario|default_if_none:'' == u.id|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</form>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    var btn = document.getElementById('btnFilter');
+    if(btn){
+        btn.addEventListener('click', function(){
+            var f = document.getElementById('filterForm');
+            if(f) f.submit();
+        });
+    }
+});
+</script>
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive">

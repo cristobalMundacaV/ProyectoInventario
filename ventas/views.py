@@ -18,8 +18,54 @@ from django.contrib.auth.decorators import login_required
 
 
 def venta_list(request):
-    ventas = Venta.objects.order_by('-fecha')[:50]
-    return render(request, 'ventas/venta_list.html', {'ventas': ventas})
+    # Filtros desde querystring
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+    metodo = request.GET.get('metodo', '')
+    usuario = request.GET.get('usuario', '')
+
+    ventas = Venta.objects.all().order_by('-fecha')
+
+    # Aplicar filtros si vienen
+    if fecha_desde:
+        try:
+            ventas = ventas.filter(fecha__date__gte=fecha_desde)
+        except Exception:
+            pass
+    if fecha_hasta:
+        try:
+            ventas = ventas.filter(fecha__date__lte=fecha_hasta)
+        except Exception:
+            pass
+    if metodo:
+        ventas = ventas.filter(metodo_pago=metodo)
+    if usuario:
+        try:
+            ventas = ventas.filter(usuario__id=int(usuario))
+        except Exception:
+            pass
+
+    # Limitar resultado razonable
+    ventas = ventas[:200]
+
+    # Preparar opciones para selects
+    User = get_user_model()
+    usuarios = User.objects.order_by('username')
+    metodo_choices = MetodoPago.choices
+
+    filtros = {
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'metodo': metodo,
+        'usuario': usuario,
+    }
+
+    return render(request, 'ventas/venta_list.html', {
+        'ventas': ventas,
+        'usuarios': usuarios,
+        'metodo_choices': metodo_choices,
+        'filtros': filtros,
+    })
 
 
 @login_required

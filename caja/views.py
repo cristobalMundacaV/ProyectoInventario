@@ -15,7 +15,8 @@ def caja_list(request):
     fecha_hasta = request.GET.get('fecha_hasta', '')
     estado = request.GET.get('estado', '')  # 'abierta'|'cerrada'|'' (todo)
 
-    cajas = Caja.objects.all().order_by('-fecha')
+    # Mostrar la caja creada más recientemente primero usando hora_apertura (DateTime)
+    cajas = Caja.objects.all().order_by('-hora_apertura')
 
     # Filtrar por rango de fechas
     if fecha_desde:

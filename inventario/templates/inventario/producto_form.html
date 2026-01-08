@@ -2,11 +2,12 @@
 {% block titulo %}{{ accion }} Producto{% endblock %}
 {% block contenido %}
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-7">
+    <div class="col-md-6 col-lg-5 mx-auto">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h2 class="fw-bold text-primary"><i class="bi bi-box icon-circle icon-circle-lg"></i> {{ accion }} Producto</h2>
+          <!-- acciones futuras -->
+        </div>
         <div class="card shadow border-0">
-            <div class="card-header bg-primary text-white fw-bold">
-                <i class="bi bi-box"></i> {{ accion }} Producto
-            </div>
             <div class="card-body">
                 <form method="post" autocomplete="off" id="productoForm">
                     {% csrf_token %}
@@ -71,14 +72,12 @@
                                     <div class="text-danger small">{{ error }}</div>
                                 {% endfor %}
                             </div>
-                            <div id="activo-container" class="mb-3">
-                                <label class="form-label fw-semibold">{{ form.activo.label }}</label>
-                                {{ form.activo }}
-                                {% if form.activo.help_text %}<div class="form-text">{{ form.activo.help_text }}</div>{% endif %}
-                                {% for error in form.activo.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
+
+                            <div class="d-flex justify-content-center gap-2 mt-3">
+                                <button type="submit" class="btn btn-success shadow btn-new-product"><i class="bi bi-check-circle"></i> Guardar</button>
+                                <a href="{% url 'producto_list' %}" class="btn btn-secondary btn-new-product"><i class="bi bi-x-circle"></i> Cancelar</a>
                             </div>
+                            {# El campo 'activo' se gestiona automáticamente según stock_base; no mostrar en el formulario #}
                             <div class="mb-3" id="field-cantidad_cajas" style="display:none;">
                                 <label class="form-label fw-semibold">Cantidad de cajas compradas <span class="text-danger">*</span></label>
                                 <input type="number" min="1" class="form-control" id="id_cantidad_cajas" name="cantidad_cajas" value="1">
@@ -92,30 +91,27 @@
                         <div class="col-md-5">
                             <div class="mb-3" id="precio-unitario-pack-container" style="display:none;">
                                 <label class="form-label fw-semibold">Precio unitario por pack:</label>
-                                <div id="precio-unitario-pack" class="form-control bg-light"></div>
+                                <div id="precio-unitario-pack" class="form-control bg-light text-center"></div>
                             </div>
                             <div class="mb-3" id="precio-kg-granel-container" style="display:none;">
                                 <label class="form-label fw-semibold">Precio costo por kg:</label>
-                                <div id="precio-kg-granel" class="form-control bg-light"></div>
+                                <div id="precio-kg-granel" class="form-control bg-light text-center"></div>
                             </div>
                             <div class="mb-3" id="margen-pack-container" style="display:none;">
                                 <label class="form-label fw-semibold">Margen unitario (Pack):</label>
-                                <div id="margen-pack" class="form-control bg-light"></div>
+                                <div id="margen-pack" class="form-control bg-light text-center"></div>
                             </div>
                             <div class="mb-3" id="margen-granel-container" style="display:none;">
                                 <label class="form-label fw-semibold">Margen unitario (Granel):</label>
-                                <div id="margen-granel" class="form-control bg-light"></div>
+                                <div id="margen-granel" class="form-control bg-light text-center"></div>
                             </div>
                             <div class="mb-3" id="stock-estimado-info" style="display:none;">
                                 <label class="form-label fw-semibold">Stock estimado:</label>
-                                <div id="stock-estimado" class="form-control bg-light"></div>
+                                <div id="stock-estimado" class="form-control bg-light text-center"></div>
                             </div>
                         </div>
                     </div>
-                    <div class="d-flex justify-content-end gap-2">
-                        <button type="submit" class="btn btn-success shadow"><i class="bi bi-check-circle"></i> Guardar</button>
-                        <a href="{% url 'producto_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Cancelar</a>
-                    </div>
+                    
                 </form>
                 <script>
                 document.addEventListener('DOMContentLoaded', function() {

@@ -3,12 +3,12 @@
 
 {% block contenido %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold text-primary"><i class="bi bi-cash-stack"></i> Cajas</h2>
+    <h2 class="fw-bold text-primary"><i class="bi bi-cash-stack icon-circle icon-circle-lg"></i> Cajas</h2>
     <div>
         {% if not cajas_abiertas %}
-        <a href="{% url 'abrir_caja' %}" class="btn btn-success shadow"><i class="bi bi-plus-circle"></i> Abrir Caja</a>
+        <a href="{% url 'abrir_caja' %}" class="btn btn-success shadow btn-new-product"><i class="bi bi-plus-circle"></i> Abrir Caja</a>
         {% else %}
-        <a href="{% url 'confirmar_cerrar_caja' %}" class="btn btn-danger shadow"> <i class="bi bi-lock"></i> Cerrar Caja</a>
+        <a href="{% url 'confirmar_cerrar_caja' %}" class="btn btn-danger shadow btn-new-product"> <i class="bi bi-lock"></i> Cerrar Caja</a>
         {% endif %}
     </div>
 </div>
@@ -50,14 +50,14 @@
     </div>
     <div class="col-md-3">
       <label class="form-label mb-1">Estado</label>
-      <select name="estado" class="form-select">
+      <select name="estado" class="form-control">
         <option value="" {% if filtros.estado == '' %}selected{% endif %}>Todos</option>
         <option value="abierta" {% if filtros.estado == 'abierta' %}selected{% endif %}>Abierta</option>
         <option value="cerrada" {% if filtros.estado == 'cerrada' %}selected{% endif %}>Cerrada</option>
       </select>
     </div>
     <div class="col-md-3 d-grid">
-      <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Filtrar</button>
+      <button type="submit" class="btn btn-primary btn-new-product"><i class="bi bi-search"></i> Filtrar</button>
     </div>
   </div>
 </form>
