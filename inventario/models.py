@@ -20,6 +20,7 @@ class Producto(models.Model):
     UNIDAD_BASE_CHOICES = [
         ('UNIDAD', 'Unidad'),
         ('PACK', 'Pack'),
+        ('KG', 'Kg'),
     ]
 
     codigo_barra = models.CharField(max_length=50, unique=True, blank=True, null=True)

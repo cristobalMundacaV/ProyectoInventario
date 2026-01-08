@@ -1,6 +1,11 @@
 from django import forms
 from .models import Producto
 
+# Formulario para añadir stock
+class AnadirStockForm(forms.Form):
+    producto = forms.ModelChoiceField(queryset=Producto.objects.all(), widget=forms.Select(attrs={'class': 'form-select'}))
+    cantidad = forms.DecimalField(min_value=0.001, decimal_places=3, max_digits=10, widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}))
+
 
 class ProductoForm(forms.ModelForm):
     class Meta:

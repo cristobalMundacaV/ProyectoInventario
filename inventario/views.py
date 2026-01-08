@@ -3,9 +3,54 @@ from django.contrib.auth.decorators import login_required
 from django.db.models.deletion import ProtectedError
 from django.contrib import messages
 from .models import Producto, Categoria
-from .forms import ProductoForm
+from .forms import ProductoForm, AnadirStockForm
 from auditoria.models import Actividad
 from caja.models import Caja
+
+
+# --- Vista para añadir stock ---
+@login_required
+def anadir_stock(request):
+    if request.method == 'POST':
+        form = AnadirStockForm(request.POST)
+        if form.is_valid():
+            producto = form.cleaned_data['producto']
+            cantidad = form.cleaned_data['cantidad']
+            producto.stock_actual_base = (producto.stock_actual_base or 0) + cantidad
+            producto.save()
+            messages.success(request, f'Se añadió {cantidad} al stock de {producto.nombre}. Stock actual: {producto.stock_actual_base} {"kg" if producto.tipo_producto == "GRANEL" else "unidades"}')
+            if 'add_another' in request.POST:
+                return redirect('anadir_stock')
+            return redirect('producto_list')
+    else:
+        form = AnadirStockForm()
+    return render(request, 'inventario/anadir_stock_form.html', {'form': form})
+
+
+# --- Vista para crear categoría ---
+from django import forms
+
+class CategoriaForm(forms.ModelForm):
+    class Meta:
+        model = Categoria
+        fields = ['nombre', 'descripcion']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+
+@login_required
+def categoria_create(request):
+    if request.method == 'POST':
+        form = CategoriaForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Categoría creada correctamente.')
+            return redirect('producto_list')
+    else:
+        form = CategoriaForm()
+    return render(request, 'inventario/categoria_form.html', {'form': form})
 
 @login_required
 def producto_list(request):

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block titulo %}Nueva Categoría{% endblock %}
+{% block contenido %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h3>Nueva Categoría</h3>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button class="btn btn-primary" type="submit">Guardar</button>
+      <a href="{% url 'producto_list' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+  </div>
+</div>
+{% endblock %}
