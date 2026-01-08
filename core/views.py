@@ -12,8 +12,12 @@ def home(request):
         # Estadísticas para el dashboard
         hoy = timezone.now().date()
         
-        # Ventas de hoy
-        ventas_hoy = Venta.objects.filter(fecha__date=hoy).count()
+        # Ventas desde apertura de caja
+        ultima_caja = Caja.objects.filter(abierta=True).order_by('-hora_apertura').first()
+        if ultima_caja:
+            ventas_hoy = Venta.objects.filter(caja=ultima_caja).count()
+        else:
+            ventas_hoy = 0
         
         # Productos con stock bajo
         productos_stock_bajo = Producto.objects.filter(stock_minimo__gt=0).count()
@@ -22,9 +26,12 @@ def home(request):
         cajas_abiertas_count = Caja.objects.filter(abierta=True).count()
         caja_abierta = cajas_abiertas_count > 0
         
-        # Últimas actividades
-        ultimas_actividades = Actividad.objects.select_related('usuario').order_by('-fecha_hora')[:10]
-        
+        # Últimas actividades: si hay una caja abierta, mostrar actividades asociadas a la última caja abierta
+        if ultima_caja:
+            ultimas_actividades = Actividad.objects.filter(caja=ultima_caja).select_related('usuario').order_by('-fecha_hora')[:10]
+        else:
+            ultimas_actividades = Actividad.objects.select_related('usuario').order_by('-fecha_hora')[:10]
+
         context = {
             'ventas_hoy': ventas_hoy,
             'productos_stock_bajo': productos_stock_bajo,

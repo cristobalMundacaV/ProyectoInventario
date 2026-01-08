@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load format_numbers %}
 {% block titulo %}Ventas{% endblock %}
 {% block contenido %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -20,9 +21,9 @@
                 </thead>
                 <tbody>
                     {% for venta in ventas %}
-                    <tr>
+                    <tr id="venta-{{ venta.id }}">
                       <td>{{ venta.fecha }}</td>
-                      <td>${{ venta.total }}</td>
+                      <td>${{ venta.total|format_decimal:2 }}</td>
                       <td>{{ venta.get_metodo_pago_display }}</td>
                       <td>{{ venta.usuario }}</td>
                       <td>{{ venta.caja }}</td>

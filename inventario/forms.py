@@ -35,6 +35,11 @@ class ProductoForm(forms.ModelForm):
             'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Allow unidad_base to be omitted from POST when the client disables it (we set a sensible default in clean())
+        self.fields['unidad_base'].required = False
+
     def clean(self):
         cleaned = super().clean()
         precio_compra = cleaned.get('precio_compra')
@@ -50,6 +55,16 @@ class ProductoForm(forms.ModelForm):
             self.add_error('unidades_por_pack', 'Este campo es requerido para productos tipo PACK.')
         if tipo == 'GRANEL' and not kg_por_caja:
             self.add_error('kg_por_caja', 'Este campo es requerido para productos tipo GRANEL/CAJA.')
+
+        # Defaults: if tipo es UNITARIO, asumimos unidad_base = 'UNIDAD'; si GRANEL, unidad_base = 'KG'
+        unidad_base = cleaned.get('unidad_base')
+        if tipo == 'UNITARIO':
+            cleaned['unidad_base'] = 'UNIDAD'
+        elif tipo == 'GRANEL' and not unidad_base:
+            cleaned['unidad_base'] = 'KG'
+        # For PACK, enforce unidad_base at clean time (user should select it when visible)
+        if tipo == 'PACK' and not cleaned.get('unidad_base'):
+            self.add_error('unidad_base', 'La unidad de venta es requerida para productos tipo PACK.')
 
         return cleaned
 

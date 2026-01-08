@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load format_numbers %}
 {% block titulo %}Productos{% endblock %}
 {% block contenido %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -69,11 +70,11 @@
                       <td class="fw-semibold">{{ producto.nombre }}</td>
                       <td>{{ producto.categoria }}</td>
                       <td>{{ producto.get_tipo_producto_display }}</td>
-                      <td>{{ producto.stock_minimo_display }}</td>
-                      <td><span class="badge bg-info text-dark">{{ producto.stock_base_display }}</span></td>
-                      <td><span class="badge bg-warning text-dark">${{ producto.precio_compra }}</span></td>
-                      <td><span class="badge bg-success">${{ producto.precio_venta }}</span></td>
-                      <td><span class="badge bg-secondary">${{ producto.margen_ganancia }}</span></td>
+                      <td>{{ producto.stock_minimo|format_decimal:3 }}</td>
+                      <td><span class="badge bg-info text-dark">{{ producto.stock_actual_base|format_decimal:3 }}</span></td>
+                      <td><span class="badge bg-warning text-dark">${{ producto.precio_compra|format_decimal:2 }}</span></td>
+                      <td><span class="badge bg-success">${{ producto.precio_venta|format_decimal:2 }}</span></td>
+                      <td><span class="badge bg-secondary">${{ producto.margen_ganancia|format_decimal:2 }}</span></td>
                       <td class="text-center">
                         <a href="{% url 'producto_update' producto.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
                         <a href="{% url 'producto_delete' producto.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar">

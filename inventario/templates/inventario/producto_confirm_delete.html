@@ -1,11 +1,45 @@
 {% extends 'base.html' %}
 {% block titulo %}Eliminar Producto{% endblock %}
 {% block contenido %}
-<h2>¿Eliminar producto?</h2>
-<p>¿Estás seguro que deseas eliminar el producto <strong>{{ producto }}</strong>?</p>
-<form method="post">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-danger">Eliminar</button>
-    <a href="{% url 'producto_list' %}" class="btn btn-secondary">Cancelar</a>
-</form>
+<div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
+    <div class="card shadow-lg border border-3 border-danger rounded-4" style="max-width: 420px; width: 100%; background: #fff8f8;">
+        <div class="card-header bg-danger text-white text-center fw-bold rounded-top-4" style="font-size: 1.2rem;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>Eliminar Producto
+        </div>
+        <div class="card-body text-center">
+            {% if protected %}
+                <div class="alert alert-danger text-start" role="alert">
+                    <h6 class="alert-heading">No se puede eliminar este producto</h6>
+                    <p>Este producto está referenciado por registros de ventas y no puede eliminarse:</p>
+                    <ul>
+                        {% for d in related_detalles %}
+                            <li><a href="{% url 'venta_list' %}#venta-{{ d.venta.id }}">Venta #{{ d.venta.id }}</a> — Detalle #{{ d.id }} — {{ d.producto }} x {{ d.cantidad_ingresada }} (Subtotal: {{ d.subtotal }})</li>
+                        {% empty %}
+                            <li>No hay registros relacionados visibles.</li>
+                        {% endfor %}
+                    </ul>
+                    <p class="mb-0"><strong>Opciones:</strong> eliminar o editar las ventas que referencian este producto, o desactivar el producto en lugar de eliminarlo.</p>
+                </div>
+                <form method="post" action="{% url 'producto_deactivate' producto.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning me-2"><i class="bi bi-toggle-off"></i> Desactivar producto</button>
+                </form>
+
+                <form method="post" action="{% url 'producto_unlink' producto.id %}" style="display:inline;" onsubmit="return confirm('Esto desvinculará el producto de todas las ventas (producto quedará NULL) pero mantendrá el producto en el sistema. ¿Continuar?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger me-2"><i class="bi bi-link-45deg"></i> Desvincular ventas</button>
+                </form>
+
+                <a href="{% url 'producto_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Volver</a>  
+            {% else %}
+                <h5 class="mb-3 text-danger">¿Estás seguro que deseas eliminar el producto <strong>{{ producto }}</strong>?</h5>
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger me-2"><i class="bi bi-trash"></i> Eliminar</button>
+                    <a href="{% url 'producto_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Cancelar</a>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
 {% endblock %}

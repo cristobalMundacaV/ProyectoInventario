@@ -14,7 +14,7 @@ class UnidadBase(models.TextChoices):
 
 class MetodoPago(models.TextChoices):
     EFECTIVO = 'EFECTIVO', 'Efectivo'
-    DEBITO = 'DEBITO', 'Débito'
+    TARJETA = 'TARJETA', 'Tarjeta'
     TRANSFERENCIA = 'TRANSFERENCIA', 'Transferencia'
 
 

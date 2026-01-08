@@ -3,12 +3,15 @@ from django.shortcuts import render, redirect
 from django.db import transaction
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+import json
+from django.utils.safestring import mark_safe
 
 from core.enums import MetodoPago, UnidadVenta
 from caja.models import Caja
 from inventario.models import Producto
 from .models import Venta, VentaDetalle
 from .forms import VentaForm, VentaDetalleFormSet
+from auditoria.models import Actividad
 
 
 def venta_list(request):
@@ -50,6 +53,8 @@ def venta_create(request):
                 'codigo_barra': p.codigo_barra,
                 'nombre': p.nombre,
                 'precio': float(p.precio_venta),
+                'precio_venta': float(p.precio_venta),
+                'tipo_producto': p.tipo_producto,
                 'producto_nombre': p.nombre,
                 'cantidad': cantidad,
                 'unidad': p.unidad_base
@@ -117,6 +122,22 @@ def venta_create(request):
                 total=sum(d['subtotal'] for d in detalles)
             )
 
+            # Registrar actividad (defensivo, por si el signal no se ejecuta o se omitió)
+            try:
+                descr = f'Venta {venta.id} total ${venta.total} ({venta.metodo_pago})'
+                if not Actividad.objects.filter(tipo_accion='VENTA', caja=caja_activa, descripcion__icontains=f'Venta {venta.id}').exists():
+                    Actividad.objects.create(
+                        usuario=usuario_actual,
+                        tipo_accion='VENTA',
+                        descripcion=descr,
+                        caja=caja_activa
+                    )
+            except Exception:
+                # No interrumpir la creación de la venta si falla la auditoría
+                pass
+
+
+
             # create venta detalles y actualizar stock
             for detalle_data in detalles:
                 VentaDetalle.objects.create(
@@ -141,11 +162,15 @@ def venta_create(request):
         vform = VentaForm(metodo_choices=metodo_choices)
         dformset = VentaDetalleFormSet(form_kwargs={'unidad_choices': unidad_choices})
 
+    # Serializar a JSON para evitar que Python 'None' aparezca como 'None' en JS
+    products_json = mark_safe(json.dumps(products_data))
+    stock_map_json = mark_safe(json.dumps(product_stock_map))
+
     return render(request, 'ventas/venta_form.html', {
         'vform': vform,
         'dformset': dformset,
-        'products': products_data,
-        'product_stock_map': product_stock_map,
+        'products': products_json,
+        'product_stock_map': stock_map_json,
         'unidad_choices': unidad_choices,
         'caja_activa': caja_activa,
         'usuario_actual': usuario_actual,

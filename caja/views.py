@@ -1,15 +1,57 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils import timezone
+from decimal import Decimal
 from .models import Caja
 from .forms import AperturaCajaForm
+from auditoria.models import Actividad
 
 @login_required
 def caja_list(request):
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+    estado = request.GET.get('estado', '')  # 'abierta'|'cerrada'|'' (todo)
+
     cajas = Caja.objects.all().order_by('-fecha')
-    return render(request, 'caja/caja_list.html', {'cajas': cajas})
+
+    # Filtrar por rango de fechas
+    if fecha_desde:
+        try:
+            cajas = cajas.filter(fecha__gte=fecha_desde)
+        except Exception:
+            pass
+    if fecha_hasta:
+        try:
+            cajas = cajas.filter(fecha__lte=fecha_hasta)
+        except Exception:
+            pass
+
+    # Filtrar por estado
+    if estado == 'abierta':
+        cajas = cajas.filter(abierta=True)
+    elif estado == 'cerrada':
+        cajas = cajas.filter(abierta=False)
+
+    # Indica si hay alguna caja abierta para controlar los botones en la plantilla
+    cajas_abiertas = Caja.objects.filter(abierta=True).exists()
+
+    filtros = {
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'estado': estado,
+    }
+
+    return render(request, 'caja/caja_list.html', {'cajas': cajas, 'cajas_abiertas': cajas_abiertas, 'filtros': filtros})
+
+
+@login_required
+def caja_detail(request, pk):
+    """Muestra el detalle de una caja: ventas y sus detalles."""
+    caja = get_object_or_404(Caja, pk=pk)
+    ventas = caja.ventas.select_related('usuario').prefetch_related('detalles__producto').order_by('-fecha')
+    return render(request, 'caja/caja_detail.html', {'caja': caja, 'ventas': ventas})
 
 @login_required
 def abrir_caja(request):
@@ -23,6 +65,14 @@ def abrir_caja(request):
                 hora_apertura=timezone.now(),
                 abierta_por=request.user
             )
+            # Registrar actividad de apertura de caja
+            Actividad.objects.create(
+                usuario=request.user,
+                tipo_accion='APERTURA_CAJA',
+                descripcion=f'Caja abierta con monto inicial ${monto_inicial}',
+                caja=caja
+            )
+
             messages.success(request, f'Caja abierta exitosamente con monto inicial de ${monto_inicial}.')
             next_url = request.GET.get('next', 'home')
             return redirect(next_url)
@@ -32,25 +82,111 @@ def abrir_caja(request):
     return render(request, 'caja/apertura_caja.html', {'form': form})
 
 @login_required
+def confirmar_cerrar_caja(request):
+    """Muestra los datos de la caja para confirmación antes de cerrar."""
+    cajas_abiertas = Caja.objects.filter(abierta=True).order_by('-hora_apertura')
+    
+    if not cajas_abiertas.exists():
+        messages.info(request, 'No hay cajas abiertas.')
+        next_url = request.GET.get('next', 'home')
+        return redirect(next_url)
+    
+    # Preparar datos de cada caja abierta
+    cajas_datos = []
+    for caja in cajas_abiertas:
+        ventas = caja.ventas.all()
+        total_vendido = Decimal('0.00')
+        total_efectivo = Decimal('0.00')
+        total_tarjeta = Decimal('0.00')
+        total_transferencia = Decimal('0.00')
+        ganancia = Decimal('0.00')
+        cantidad_ventas = ventas.count()
+
+        for v in ventas:
+            total_vendido += Decimal(str(v.total))
+            if v.metodo_pago == 'EFECTIVO':
+                total_efectivo += Decimal(str(v.total))
+            elif v.metodo_pago == 'TARJETA':
+                total_tarjeta += Decimal(str(v.total))
+            elif v.metodo_pago == 'TRANSFERENCIA':
+                total_transferencia += Decimal(str(v.total))
+
+            # Ganancia por cada detalle: margen * cantidad_base
+            for det in v.detalles.all():
+                margen = det.producto.margen_ganancia or 0
+                ganancia += Decimal(str(margen)) * Decimal(str(det.cantidad_base))
+
+        cajas_datos.append({
+            'caja': caja,
+            'cantidad_ventas': cantidad_ventas,
+            'total_vendido': total_vendido,
+            'total_efectivo': total_efectivo,
+            'total_tarjeta': total_tarjeta,
+            'total_transferencia': total_transferencia,
+            'ganancia': ganancia,
+            'ventas': ventas.order_by('-fecha')[:5]  # Últimas 5 ventas
+        })
+    
+    return render(request, 'caja/confirmar_cierre.html', {'cajas_datos': cajas_datos})
+
+@login_required
 def cerrar_caja(request):
-    cajas_abiertas = Caja.objects.filter(abierta=True)
-    
-    if cajas_abiertas.exists():
-        # Cerrar todas las cajas abiertas
-        count = cajas_abiertas.count()
-        for caja in cajas_abiertas:
-            caja.abierta = False
-            caja.hora_cierre = timezone.now()
-            caja.cerrada_por = request.user
-            caja.save()
+    if request.method == 'POST':
+        cajas_abiertas = Caja.objects.filter(abierta=True)
         
-        if count == 1:
-            messages.success(request, 'Caja cerrada exitosamente.')
+        if cajas_abiertas.exists():
+            # Cerrar todas las cajas abiertas
+            count = cajas_abiertas.count()
+            for caja in cajas_abiertas:
+                caja.abierta = False
+                caja.hora_cierre = timezone.now()
+                caja.cerrada_por = request.user
+
+                # Agregar resumen de ventas y cálculo de ganancia
+                ventas = caja.ventas.all()
+                total_vendido = Decimal('0.00')
+                total_efectivo = Decimal('0.00')
+                total_tarjeta = Decimal('0.00')
+                total_transferencia = Decimal('0.00')
+                ganancia = Decimal('0.00')
+
+                for v in ventas:
+                    total_vendido += Decimal(str(v.total))
+                    if v.metodo_pago == 'EFECTIVO':
+                        total_efectivo += Decimal(str(v.total))
+                    elif v.metodo_pago == 'TARJETA':
+                        total_tarjeta += Decimal(str(v.total))
+                    elif v.metodo_pago == 'TRANSFERENCIA':
+                        total_transferencia += Decimal(str(v.total))
+
+                    # Ganancia por cada detalle: margen * cantidad_base
+                    for det in v.detalles.all():
+                        margen = det.producto.margen_ganancia or 0
+                        ganancia += Decimal(str(margen)) * Decimal(str(det.cantidad_base))
+
+                caja.total_vendido = total_vendido
+                caja.total_efectivo = total_efectivo
+                caja.total_tarjeta = total_tarjeta
+                caja.total_transferencia = total_transferencia
+                caja.ganancia_diaria = ganancia
+
+                caja.save()
+
+                # Registrar actividad de cierre de caja
+                Actividad.objects.create(
+                    usuario=request.user,
+                    tipo_accion='CIERRE_CAJA',
+                    descripcion=f'Caja cerrada. Total vendido: ${total_vendido}',
+                    caja=caja
+                )
+
+            messages.success(request, f'{count} caja(s) cerradas exitosamente.')
+            next_url = request.GET.get('next', 'home')
+            return redirect(next_url)
         else:
-            messages.success(request, f'Se cerraron {count} cajas exitosamente.')
+            messages.info(request, 'No hay cajas abiertas.')
+            next_url = request.GET.get('next', 'home')
+            return redirect(next_url)
     else:
-        messages.error(request, 'No hay cajas abiertas para cerrar.')
-    
-    # Redirigir al home si viene desde allí, sino a caja_list
-    next_url = request.GET.get('next', 'caja_list')
-    return redirect(next_url)
+        # Si es GET, redirigir a la página de confirmación
+        return redirect('confirmar_cerrar_caja')

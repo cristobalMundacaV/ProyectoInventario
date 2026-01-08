@@ -1,108 +1,110 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %}{% load format_numbers %}
+{% block titulo %}Cajas{% endblock %}
 
-{% block title %}Lista de Cajas{% endblock %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-primary"><i class="bi bi-cash-stack"></i> Cajas</h2>
+    <div>
+        {% if not cajas_abiertas %}
+        <a href="{% url 'abrir_caja' %}" class="btn btn-success shadow"><i class="bi bi-plus-circle"></i> Abrir Caja</a>
+        {% else %}
+        <a href="{% url 'confirmar_cerrar_caja' %}" class="btn btn-danger shadow"> <i class="bi bi-lock"></i> Cerrar Caja</a>
+        {% endif %}
+    </div>
+</div>
 
-{% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0">Gestión de Cajas</h4>
-                    <div>
-                        {% if not cajas_abiertas %}
-                        <a href="{% url 'abrir_caja' %}" class="btn btn-success">
-                            <i class="fas fa-plus"></i> Abrir Caja
-                        </a>
-                        {% else %}
-                        <a href="{% url 'cerrar_caja' %}" class="btn btn-danger">
-                            <i class="fas fa-lock"></i> Cerrar Caja
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="card-body">
-                    {% if cajas %}
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Estado</th>
-                                    <th>Monto Inicial</th>
-                                    <th>Hora Apertura</th>
-                                    <th>Abierta por</th>
-                                    <th>Hora Cierre</th>
-                                    <th>Cerrada por</th>
-                                    <th>Total Vendido</th>
-                                    <th>Efectivo</th>
-                                    <th>Débito</th>
-                                    <th>Transferencia</th>
-                                    <th>Ganancia</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for caja in cajas %}
-                                <tr>
-                                    <td>{{ caja.fecha }}</td>
-                                    <td>
-                                        {% if caja.abierta %}
-                                        <span class="badge bg-success">Abierta</span>
-                                        {% else %}
-                                        <span class="badge bg-danger">Cerrada</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>${{ caja.monto_inicial }}</td>
-                                    <td>{{ caja.hora_apertura|date:"H:i" }}</td>
-                                    <td>
-                                        {% if caja.abierta_por %}
-                                            {{ caja.abierta_por.username }}
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if caja.hora_cierre %}
-                                            {{ caja.hora_cierre|date:"H:i" }}
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if caja.cerrada_por %}
-                                            {{ caja.cerrada_por.username }}
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>${{ caja.total_vendido }}</td>
-                                    <td>${{ caja.total_efectivo }}</td>
-                                    <td>${{ caja.total_debito }}</td>
-                                    <td>${{ caja.total_transferencia }}</td>
-                                    <td>${{ caja.ganancia_diaria }}</td>
-                                    <td>
-                                        <a href="#" class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        No hay cajas registradas. 
-                        {% if not cajas_abiertas %}
-                        <a href="{% url 'abrir_caja' %}" class="alert-link">Abrir nueva caja</a>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
+{% if messages %}
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080;">
+    {% for message in messages %}
+      <div class="toast align-items-center text-bg-{{ message.tags }} border-0 show mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body">
+            <i class="bi bi-info-circle-fill me-2"></i>{{ message }}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+      toastElList.forEach(function(toastEl) {
+        var option = { delay: 3000 };
+        var bsToast = new bootstrap.Toast(toastEl, option);
+        bsToast.show();
+      });
+    });
+  </script>
+{% endif %}
+
+<form method="get" class="mb-4">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label mb-1">Desde</label>
+      <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label mb-1">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label mb-1">Estado</label>
+      <select name="estado" class="form-select">
+        <option value="" {% if filtros.estado == '' %}selected{% endif %}>Todos</option>
+        <option value="abierta" {% if filtros.estado == 'abierta' %}selected{% endif %}>Abierta</option>
+        <option value="cerrada" {% if filtros.estado == 'cerrada' %}selected{% endif %}>Cerrada</option>
+      </select>
+    </div>
+    <div class="col-md-3 d-grid">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Filtrar</button>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Monto Inicial</th>
+                        <th>Hora Apertura</th>
+                        <th>Hora Cierre</th>
+                        <th>Total Vendido</th>
+                        <th>Efectivo</th>
+                        <th>Débito</th>
+                        <th>Transferencia</th>
+                        <th>Ganancia</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for caja in cajas %}
+                    <tr>
+                        <td>{{ caja.fecha }}</td>
+                        <td>{% if caja.abierta %}<span class="badge bg-success">Abierta</span>{% else %}<span class="badge bg-danger">Cerrada</span>{% endif %}</td>
+                        <td>${{ caja.monto_inicial|format_decimal:2 }}</td>
+                        <td>{{ caja.hora_apertura|date:"H:i" }}</td>
+                        <td>{% if caja.hora_cierre %}{{ caja.hora_cierre|date:"H:i" }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                        <td>${{ caja.total_vendido|format_decimal:2 }}</td>
+                        <td>${{ caja.total_efectivo|format_decimal:2 }}</td>
+                        <td>${{ caja.total_debito|format_decimal:2 }}</td>
+                        <td>${{ caja.total_transferencia|format_decimal:2 }}</td>
+                        <td>${{ caja.ganancia_diaria|format_decimal:2 }}</td>
+                        <td class="text-center">
+                            <a href="{% url 'caja_detail' caja.id %}" class="btn btn-outline-info btn-sm" title="Ver"><i class="bi bi-eye"></i></a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="11" class="text-center text-muted">No hay cajas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+
 {% endblock %}

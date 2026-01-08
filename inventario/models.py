@@ -19,9 +19,7 @@ class Producto(models.Model):
 
     UNIDAD_BASE_CHOICES = [
         ('UNIDAD', 'Unidad'),
-        ('KG', 'Kilogramo'),
         ('PACK', 'Pack'),
-        ('CAJA', 'Caja'),
     ]
 
     codigo_barra = models.CharField(max_length=50, unique=True, blank=True, null=True)
@@ -62,13 +60,16 @@ class Producto(models.Model):
     @property
     def stock_display(self):
         if self.tipo_producto == 'GRANEL':
-            return self.stock_actual_base
+            return f"{self.stock_actual_base} kg"
+        # Si el producto es PACK pero se vende por unidad, mostrar el stock en unidades
+        if self.tipo_producto == 'PACK' and self.unidad_base == 'UNIDAD' and self.unidades_por_pack:
+            return int(self.stock_actual_base) * int(self.unidades_por_pack)
         return int(self.stock_actual_base)
 
     @property
     def stock_minimo_display(self):
         if self.tipo_producto == 'GRANEL':
-            return str(self.stock_minimo or 0)
+            return f"{self.stock_minimo or 0} kg"
         return str(int(self.stock_minimo or 0))
 
     @property

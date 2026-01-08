@@ -16,7 +16,7 @@
                     <div class="row mb-3 align-items-end">
                         <div class="col-md-5">
                             <label class="form-label fw-semibold">Escanear Código de Barras</label>
-                            <input type="text" id="barcodeScanner" class="form-control" placeholder="Apunte el lector aquí o escriba el código..." autocomplete="off">
+                            <input type="text" id="barcodeScanner" class="form-control" placeholder="Apunte el lector aquí o escriba el código o id..." autocomplete="off">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Cantidad</label>
@@ -55,6 +55,7 @@
                             </tfoot>
                         </table>
                     </div>
+                    <div id="scanMessage" class="alert alert-success mt-2 text-center" style="display:none;"></div>
 
                     <!-- Campos ocultos para el formset -->
                     <div id="hiddenFields" style="display:none;">
@@ -75,7 +76,7 @@
                 <i class="bi bi-currency-dollar"></i> Datos de la Venta
             </div>
             <div class="card-body">
-                <form method="post" id="ventaForm">
+                <form method="post" id="ventaSubmitForm">
                     {% csrf_token %}
                     
                     <!-- Información automática -->
@@ -117,16 +118,47 @@ document.addEventListener('DOMContentLoaded', function() {
     let productosAgregados = [];
     let formCounter = 0;
 
-    // Mapeo de productos por código de barras
+    // Mapeo de productos por código de barras y por id
     const productByBarcode = {};
+    const productById = {};
     productsData.forEach(function(p) {
-        productByBarcode[p.codigo_barra] = p;
+        if (p.codigo_barra) productByBarcode[String(p.codigo_barra)] = p;
+        productById[String(p.id)] = p;
     });
+
+    // Formatea números: si decimales son ceros, no los muestra; acepta cantidad de decimales
+    function formatDecimal(q, decimals) {
+        const n = Number(q);
+        if (Number.isNaN(n)) return '';
+        const fixed = n.toFixed(decimals);
+        const num = Number(fixed);
+        return String(num);
+    }
+
+    function formatQuantity(q) {
+        return formatDecimal(q, 3);
+    }
+    function showScanMessage(product, quantity) {
+        const msg = document.getElementById('scanMessage');
+        if (!msg) return;
+        msg.textContent = 'Agregado: ' + product.nombre + ' x ' + formatQuantity(quantity);
+        msg.style.display = 'block';
+        setTimeout(function() { msg.style.display = 'none'; }, 1500);
+    }
 
     // Función para agregar producto a la tabla
     function addProductToTable(barcode, quantity) {
         quantity = quantity || 1;
-        const product = productByBarcode[barcode];
+        barcode = String(barcode || '').trim();
+        // Lookup by barcode or by product id
+        let product = productByBarcode[barcode] || productById[barcode];
+        if (!product) {
+            // try numeric parsing (e.g., user entered numeric id)
+            const maybeId = String(parseInt(barcode, 10));
+            if (!isNaN(Number(maybeId))) {
+                product = productById[maybeId];
+            }
+        }
         if (!product) {
             alert('Producto no encontrado: ' + barcode);
             return false;
@@ -152,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
             
-            qtyCell.textContent = newQty.toFixed(3);
+            qtyCell.textContent = formatQuantity(newQty);
             updateRowSubtotal(existingRow);
         } else {
             // Agregar nueva fila
@@ -162,14 +194,14 @@ document.addEventListener('DOMContentLoaded', function() {
             row.setAttribute('data-product-id', product.id);
             
             const unidadDisplay = getUnidadDisplay(product.tipo_producto);
-            const subtotal = (product.precio_venta * quantity).toFixed(2);
+            const subtotal = (product.precio_venta * quantity);
             
             row.innerHTML = '<td>' + product.codigo_barra + '</td>' +
                 '<td>' + product.nombre + '</td>' +
-                '<td>$' + product.precio_venta.toFixed(2) + '</td>' +
-                '<td data-field="cantidad">' + quantity.toFixed(3) + '</td>' +
+                '<td>$' + formatDecimal(product.precio_venta, 2) + '</td>' +
+                '<td data-field="cantidad">' + formatQuantity(quantity) + '</td>' +
                 '<td data-field="unidad">' + unidadDisplay + '</td>' +
-                '<td data-field="subtotal">$' + subtotal + '</td>' +
+                '<td data-field="subtotal">$' + formatDecimal(subtotal, 2) + '</td>' +
                 '<td><button type="button" class="btn btn-sm btn-outline-danger remove-product" style="border-radius: 999px;"><i class="bi bi-trash"></i></button></td>';
             
             tbody.appendChild(row);
@@ -178,6 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         updateTotal();
         updateHiddenFields();
+        showScanMessage(product, quantity);
         return true;
     }
 
@@ -191,10 +224,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateRowSubtotal(row) {
-        const price = parseFloat(row.cells[2].textContent.replace('$', ''));
-        const quantity = parseFloat(row.cells[3].textContent);
-        const subtotal = (price * quantity).toFixed(2);
-        row.cells[5].textContent = '$' + subtotal;
+        const price = parseFloat(row.cells[2].textContent.replace('$', '')) || 0;
+        const quantity = parseFloat(row.cells[3].textContent) || 0;
+        const subtotal = (price * quantity);
+        row.cells[5].textContent = '$' + formatDecimal(subtotal, 2);
     }
 
     function updateTotal() {
@@ -202,10 +235,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const rows = document.querySelectorAll('#productosTableBody tr');
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            const subtotal = parseFloat(row.cells[5].textContent.replace('$', ''));
+            const subtotal = parseFloat(row.cells[5].textContent.replace('$', '')) || 0;
             total += subtotal;
         }
-        document.getElementById('totalAmount').textContent = '$' + total.toFixed(2);
+        document.getElementById('totalAmount').textContent = '$' + formatDecimal(total, 2);
     }
 
     function attachRowEvents(row) {
@@ -281,6 +314,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Click handler para el botón Agregar Producto
+    const btnAgregar = document.getElementById('btnAgregarProducto');
+    if (btnAgregar) {
+        btnAgregar.addEventListener('click', function(e) {
+            e.preventDefault();
+            const barcodeInput = document.getElementById('barcodeScanner');
+            const barcode = barcodeInput ? barcodeInput.value.trim() : '';
+            const quantity = parseFloat(document.getElementById('defaultQuantity').value) || 1;
+
+            if (!barcode) {
+                alert('Ingrese el código de barras o escanee un producto.');
+                if (barcodeInput) barcodeInput.focus();
+                return;
+            }
+
+            if (addProductToTable(barcode, quantity)) {
+                if (barcodeInput) barcodeInput.value = '';
+                document.getElementById('defaultQuantity').value = '1';
+                if (barcodeInput) barcodeInput.focus();
+            }
+        });
+    }
+
     // Prevenir envío del formulario con Enter
     const formElement = document.getElementById('ventaForm');
     if (formElement) {
@@ -288,6 +344,32 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.key === 'Enter' && e.target.id !== 'barcodeScanner') {
                 e.preventDefault();
             }
+        });
+    }
+
+    // Ensure hidden formset data and management inputs are submitted with the venta submit form
+    const ventaSubmitForm = document.getElementById('ventaSubmitForm');
+    if (ventaSubmitForm) {
+        ventaSubmitForm.addEventListener('submit', function(e) {
+            // Rebuild hidden fields so TOTAL_FORMS is correct
+            updateHiddenFields();
+            const hiddenContainer = document.getElementById('hiddenFields');
+
+            // Copy management inputs (TOTAL_FORMS, INITIAL_FORMS, MAX_NUM_FORMS) into the submit form
+            ['id_form-TOTAL_FORMS','id_form-INITIAL_FORMS','id_form-MAX_NUM_FORMS'].forEach(function(id) {
+                const elem = document.getElementById(id);
+                if (elem && !ventaSubmitForm.querySelector('#' + id)) {
+                    ventaSubmitForm.appendChild(elem.cloneNode(true));
+                }
+            });
+
+            // Copy per-line hidden inputs into the submit form
+            if (hiddenContainer) {
+                Array.from(hiddenContainer.children).forEach(function(child) {
+                    ventaSubmitForm.appendChild(child.cloneNode(true));
+                });
+            }
+            // Let the form submit normally
         });
     }
 });

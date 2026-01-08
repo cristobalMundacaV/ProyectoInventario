@@ -3,6 +3,55 @@
 {% block title %}Panel Principal{% endblock %}
 
 {% block contenido %}
+<style>
+    /* Make all buttons on home page fully rounded */
+    .container-fluid .btn {
+        border-radius: 999px !important;
+    }
+    
+    /* Make all icons circular with colored background */
+    .card-header i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.2);
+        margin-right: 10px;
+        font-size: 18px;
+    }
+    
+    .btn i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.2);
+        margin-right: 8px;
+        font-size: 16px;
+    }
+    
+    /* Special styling for plus icons to make them bigger */
+    .btn .bi-plus {
+        font-size: 18px !important;
+        font-weight: bold;
+    }
+    
+    .list-group-item i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        margin-right: 5px;
+        font-size: 12px;
+    }
+</style>
 <div class="container-fluid">
     <div class="row">
         <!-- Tarjeta de Ventas -->
@@ -19,7 +68,7 @@
                         <div class="col-md-6">
                             <div class="d-grid gap-2">
                                 <a href="{% url 'venta_create' %}" class="btn btn-success btn-lg">
-                                    <i class="bi bi-plus-circle"></i>
+                                    <i class="bi bi-plus"></i>
                                     Nueva Venta
                                 </a>
                                 <a href="{% url 'venta_list' %}" class="btn btn-info btn-lg">
@@ -29,7 +78,7 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="text-center">
+                            <div class="text-center"> 
                                 <h6 class="text-muted">Ventas del Día</h6>
                                 <h3 class="text-primary">{{ ventas_hoy|default:0 }}</h3>
                             </div>
@@ -65,7 +114,7 @@
 
             <!-- Caja -->
             <div class="card mb-4">
-                <div class="card-header bg-warning text-white">
+                <div class="card-header bg-orange text-white">
                     <h6 class="mb-0">
                         <i class="bi bi-cash-stack"></i>
                         Caja
@@ -73,20 +122,17 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <a href="{% url 'caja_list' %}" class="btn btn-outline-warning w-100">
+                        <a id="ver-cajas" href="{% url 'caja_list' %}" class="btn btn-outline-orange w-100" onclick="event.preventDefault(); console.log('ver-cajas clicked'); window.location.href=this.href;">
                             <i class="bi bi-cash"></i>
                             Ver Cajas
                         </a>
                         {% if caja_abierta %}
-                        <form method="post" action="{% url 'cerrar_caja' %}?next=home" style="display: inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-danger w-100">
-                                <i class="bi bi-lock"></i>
-                                Cerrar Caja {% if cajas_abiertas_count > 1 %}({{ cajas_abiertas_count }}){% endif %}
-                            </button>
-                        </form>
+                        <a href="{% url 'confirmar_cerrar_caja' %}?next=home" class="btn btn-danger w-100">
+                            <i class="bi bi-lock"></i>
+                            Cerrar Caja {% if cajas_abiertas_count > 1 %}({{ cajas_abiertas_count }}){% endif %}
+                        </a>
                         {% else %}
-                        <a href="{% url 'abrir_caja' %}?next=home" class="btn btn-warning w-100">
+                        <a href="{% url 'abrir_caja' %}?next=home" class="btn btn-orange w-100">
                             <i class="bi bi-unlock"></i>
                             Abrir Caja
                         </a>

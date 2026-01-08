@@ -10,6 +10,7 @@ class Actividad(models.Model):
         ('INGRESO_STOCK', 'Ingreso de Stock'),
         ('CREACION_PRODUCTO', 'Creación de Producto'),
         ('EDICION_PRODUCTO', 'Edición de Producto'),
+        ('CREACION_CATEGORIA', 'Creación de Categoría'),
     ]
 
     fecha_hora = models.DateTimeField(auto_now_add=True)
@@ -22,6 +23,13 @@ class Actividad(models.Model):
         choices=TIPO_ACCION_CHOICES
     )
     descripcion = models.CharField(max_length=255)
+    caja = models.ForeignKey(
+        'caja.Caja',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='actividades'
+    )
 
     def __str__(self):
         return f"{self.tipo_accion} - {self.fecha_hora}"

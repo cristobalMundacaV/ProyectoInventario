@@ -37,14 +37,38 @@
             font-weight: bold;
             font-size: 20px;
             color: white !important;
+            display: flex;
+            align-items: center;
         }
         .nav-link {
             color: white !important;
             margin: 0 10px;
             transition: 0.3s;
+            display: flex;
+            align-items: center;
         }
         .nav-link:hover {
             color: #ffd700 !important;
+        }
+        
+        /* Make navbar icons circular */
+        .navbar-brand i,
+        .nav-link i {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.2);
+            margin-right: 8px;
+            font-size: 18px;
+        }
+        
+        .navbar-brand i {
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
         }
         /* Reduce spacing specifically entre Inventario y Ventas (más cercano: 3x) */
         #ventasDropdown {
@@ -92,6 +116,28 @@
             border: 1px solid #e0e0e0;
         }
         
+        /* Colores personalizados */
+        .bg-orange {
+            background: #ff7a00 !important; /* naranja */
+        }
+        .btn-orange {
+            background: #ff7a00;
+            color: #ffffff;
+            border: none;
+        }
+        .btn-orange:hover {
+            background: #e66f00;
+            color: #ffffff;
+        }
+        .btn-outline-orange {
+            color: #ff7a00;
+            border-color: #ff7a00;
+        }
+        .btn-outline-orange:hover {
+            background: #ff7a00;
+            color: #ffffff;
+        }
+
         .form-control {
             border: 1px solid #ddd;
             padding: 10px 15px;
