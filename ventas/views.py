@@ -185,8 +185,10 @@ def venta_create(request):
                 producto.stock_actual_base -= detalle_data['cantidad_base']
                 producto.save()
 
-            messages.success(request, 'Venta creada exitosamente.')
-            return redirect('home')
+            # En lugar de redirigir inmediatamente, mostrar confirmación con opción de imprimir boleta
+            return render(request, 'ventas/venta_confirm_print.html', {
+                'venta': venta,
+            })
 
     else:
         vform = VentaForm(metodo_choices=metodo_choices)

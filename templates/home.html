@@ -226,8 +226,10 @@
 document.getElementById('go-comprobante')?.addEventListener('click', function(){
     var id = document.getElementById('comprobante-id').value;
     if(!id){ alert('Ingrese el ID de la venta'); return; }
-    // Redirect to comprobante URL
-    window.location.href = '/ventas/' + id + '/comprobante/';
+    // Build URL from Django reverse pattern for robustness
+    var pattern = "{% url 'venta_comprobante' 0 %}"; // e.g. /ventas/0/comprobante/
+    var url = pattern.replace('/0/', '/' + encodeURIComponent(id) + '/');
+    window.location.href = url;
 });
 </script>
 {% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load format_numbers tz %}
+
+{% block titulo %}Venta creada{% endblock %}
+
+{% block contenido %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Venta creada correctamente</h5>
+        </div>
+        <div class="card-body">
+            <p>Venta <strong>#{{ venta.id }}</strong> creada con éxito.</p>
+
+            <div class="mb-3">
+                <div class="table-responsive">
+                    <table class="table table-sm small" style="font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-center">Cantidad</th>
+                                <th class="text-center">Precio</th>
+                                <th class="text-center">Subtotal</th>
+                                <th class="text-center">Fecha</th>
+                                <th class="text-center">Método</th>
+                                <th class="text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in venta.detalles.all %}
+                            <tr>
+                                <td class="text-center">{{ d.producto }}</td>
+                                <td class="text-center">{{ d.cantidad_ingresada|format_decimal:3 }}</td>
+                                <td class="text-center">${{ d.precio_unitario|format_decimal:2 }}</td>
+                                <td class="text-center">${{ d.subtotal|format_decimal:2 }}</td>
+                                {% if forloop.first %}
+                                <td class="text-center">{{ venta.fecha|localtime|date:"d/m/Y H:i" }}</td>
+                                <td class="text-center">{{ venta.get_metodo_pago_display }}</td>
+                                <td class="text-center">${{ venta.total|format_money }}</td>
+                                {% else %}
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                {% endif %}
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td class="text-start">-</td>
+                                <td class="text-end">-</td>
+                                <td class="text-end">-</td>
+                                <td class="text-end">-</td>
+                                <td class="text-center">{{ venta.fecha|localtime|date:"d/m/Y H:i" }}</td>
+                                <td class="text-center">{{ venta.get_metodo_pago_display }}</td>
+                                <td class="text-end">${{ venta.total|format_money }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button id="btn-print" class="btn btn-primary">Imprimir boleta</button>
+                <a href="{% url 'home' %}" class="btn btn-secondary">Volver al inicio</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('btn-print')?.addEventListener('click', function(){
+    // Abrir comprobante en nueva ventana y llamar a print cuando cargue
+    var url = "{% url 'venta_comprobante' venta.id %}";
+    var w = window.open(url, '_blank');
+    if(!w){
+        alert('No se pudo abrir la ventana de impresión. Compruebe el bloqueador de pop-ups.');
+        return;
+    }
+    // Intentar imprimir cuando la nueva ventana termine de cargar
+    w.addEventListener('load', function(){
+        try{ w.print(); }catch(e){ console.warn('print failed', e); }
+    });
+});
+</script>
+{% endblock %}
