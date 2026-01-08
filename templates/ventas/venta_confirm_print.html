@@ -71,16 +71,43 @@
 {% block extra_js %}
 <script>
 document.getElementById('btn-print')?.addEventListener('click', function(){
-    // Abrir comprobante en nueva ventana y llamar a print cuando cargue
+    // Obtener el HTML del comprobante y escribirlo en una ventana en blanco para imprimir
     var url = "{% url 'venta_comprobante' venta.id %}";
-    var w = window.open(url, '_blank');
-    if(!w){
-        alert('No se pudo abrir la ventana de impresión. Compruebe el bloqueador de pop-ups.');
-        return;
-    }
-    // Intentar imprimir cuando la nueva ventana termine de cargar
-    w.addEventListener('load', function(){
-        try{ w.print(); }catch(e){ console.warn('print failed', e); }
+    fetch(url, { credentials: 'same-origin' }).then(function(resp){
+        if(!resp.ok) throw new Error('network');
+        return resp.text();
+    }).then(function(html){
+        // Limpiar scripts y controles de impresión del HTML para evitar que el comprobante vuelva a ofrecer imprimir
+        var cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+        // Quitar el bloque que contiene el botón/anchor de impresión (clase no-print)
+        cleaned = cleaned.replace(/<p[^>]*class=["']?no-print["']?[^>]*>[\s\S]*?<\/p>/gi, '');
+
+        var w = window.open('', '_blank');
+        if(!w){
+            alert('No se pudo abrir la ventana de impresión. Compruebe el bloqueador de pop-ups.');
+            return;
+        }
+        // Escribir el HTML limpio en la nueva ventana
+        w.document.open();
+        w.document.write(cleaned);
+        w.document.close();
+        try{ w.focus(); }catch(e){}
+
+        // Forzar impresión y luego redirigir y cerrar
+        try{
+            // Intentar imprimir y luego redirigir el padre al home
+            setTimeout(function(){
+                try{ w.print(); }catch(e){ console.warn('print failed', e); }
+                try{ window.location.href = "{% url 'home' %}"; }catch(e){}
+                try{ w.close(); }catch(e){}
+            }, 200);
+        }catch(e){
+            console.error(e);
+            alert('Error al imprimir el comprobante.');
+        }
+    }).catch(function(err){
+        console.error(err);
+        alert('No se pudo cargar el comprobante para impresión.');
     });
 });
 </script>

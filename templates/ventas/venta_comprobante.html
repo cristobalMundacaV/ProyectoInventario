@@ -45,11 +45,41 @@
     </table>
 
     <div class="center mt-3">
-        <p class="no-print"><a href="javascript:window.print();" class="btn">Imprimir</a></p>
+        <p class="no-print"><button type="button" onclick="printAndRedirect()" class="btn">Imprimir</button></p>
     </div>
     <div class="center" style="margin-top:8px;">
         <p style="font-size:11px; font-weight:700; margin:0;">Sistema de Gestion de Ventas e Inventario</p>
     </div>
 </div>
+<script>
+function _afterPrintRedirect(){
+    try{
+        if(window.opener && !window.opener.closed){
+            window.opener.location.href = "{% url 'home' %}";
+        } else {
+            window.location.href = "{% url 'home' %}";
+        }
+    }catch(e){
+        try{ window.location.href = "{% url 'home' %}"; }catch(_){}
+    }
+    try{ window.close(); }catch(e){}
+}
+
+function printAndRedirect(){
+    try{
+        window.print();
+    }catch(e){
+        console.warn('print failed', e);
+    }
+    // After window.print() returns (blocking in many browsers), redirect/close
+    setTimeout(_afterPrintRedirect, 200);
+}
+
+if('onafterprint' in window){
+    window.onafterprint = _afterPrintRedirect;
+} else {
+    window.addEventListener('afterprint', _afterPrintRedirect);
+}
+</script>
 </body>
 </html>
