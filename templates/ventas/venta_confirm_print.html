@@ -45,13 +45,13 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td class="text-start">-</td>
-                                <td class="text-end">-</td>
-                                <td class="text-end">-</td>
-                                <td class="text-end">-</td>
+                                <td class="text-center">-</td>
+                                <td class="text-center">-</td>
+                                <td class="text-center">-</td>
+                                <td class="text-center">-</td>
                                 <td class="text-center">{{ venta.fecha|localtime|date:"d/m/Y H:i" }}</td>
                                 <td class="text-center">{{ venta.get_metodo_pago_display }}</td>
-                                <td class="text-end">${{ venta.total|format_money }}</td>
+                                <td class="text-center">${{ venta.total|format_money }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
