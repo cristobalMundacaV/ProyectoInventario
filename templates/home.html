@@ -51,6 +51,23 @@
         margin-right: 5px;
         font-size: 12px;
     }
+
+    /* Place Últimas Actividades at the same height as Ventas module */
+    .ultimas-actividades {
+        position: relative; /* stays at the top of the column */
+        margin-top: 0; /* align with Ventas card - no gap */
+        margin-left: auto; /* align card to the right within the column */
+        max-width: 500px;
+        width: 100%;
+    }
+
+    /* On smaller screens, make the activities card full width so it stacks nicely */
+    @media (max-width: 991px) {
+        .ultimas-actividades {
+            margin-left: 0;
+            max-width: 100%;
+        }
+    }
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -86,63 +103,67 @@
                     </div>
                 </div>
             </div>
-        </div>
 
+            <!-- Inventario y Caja debajo de Ventas (cada módulo en su propia card) -->
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <!-- Inventario -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0">
+                                <i class="bi bi-box"></i>
+                                Inventario
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'producto_list' %}" class="btn btn-outline-success w-100">
+                                    <i class="bi bi-box-seam"></i>
+                                    Productos
+                                </a>
+                                <a href="{% url 'producto_create' %}" class="btn btn-success w-100">
+                                    <i class="bi bi-plus"></i>
+                                    Nuevo Producto
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- Caja -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-orange text-white">
+                            <h6 class="mb-0">
+                                <i class="bi bi-cash-stack"></i>
+                                Caja
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a id="ver-cajas" href="{% url 'caja_list' %}" class="btn btn-outline-orange w-100" onclick="event.preventDefault(); console.log('ver-cajas clicked'); window.location.href=this.href;">
+                                    <i class="bi bi-cash"></i>
+                                    Ver Cajas
+                                </a>
+                                {% if caja_abierta %}
+                                <a href="{% url 'confirmar_cerrar_caja' %}?next=home" class="btn btn-danger w-100">
+                                    <i class="bi bi-lock"></i>
+                                    Cerrar Caja {% if cajas_abiertas_count > 1 %}({{ cajas_abiertas_count }}){% endif %}
+                                </a>
+                                {% else %}
+                                <a href="{% url 'abrir_caja' %}?next=home" class="btn btn-orange w-100">
+                                    <i class="bi bi-unlock"></i>
+                                    Abrir Caja
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>            </div>
         <!-- Panel Lateral -->
-        <div class="col-lg-4">
-            <!-- Inventario -->
-            <div class="card mb-4">
-                <div class="card-header bg-success text-white">
-                    <h6 class="mb-0">
-                        <i class="bi bi-box"></i>
-                        Inventario
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'producto_list' %}" class="btn btn-outline-success w-100">
-                            <i class="bi bi-box-seam"></i>
-                            Productos
-                        </a>
-                        <a href="{% url 'producto_create' %}" class="btn btn-success w-100">
-                            <i class="bi bi-plus"></i>
-                            Nuevo Producto
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Caja -->
-            <div class="card mb-4">
-                <div class="card-header bg-orange text-white">
-                    <h6 class="mb-0">
-                        <i class="bi bi-cash-stack"></i>
-                        Caja
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a id="ver-cajas" href="{% url 'caja_list' %}" class="btn btn-outline-orange w-100" onclick="event.preventDefault(); console.log('ver-cajas clicked'); window.location.href=this.href;">
-                            <i class="bi bi-cash"></i>
-                            Ver Cajas
-                        </a>
-                        {% if caja_abierta %}
-                        <a href="{% url 'confirmar_cerrar_caja' %}?next=home" class="btn btn-danger w-100">
-                            <i class="bi bi-lock"></i>
-                            Cerrar Caja {% if cajas_abiertas_count > 1 %}({{ cajas_abiertas_count }}){% endif %}
-                        </a>
-                        {% else %}
-                        <a href="{% url 'abrir_caja' %}?next=home" class="btn btn-orange w-100">
-                            <i class="bi bi-unlock"></i>
-                            Abrir Caja
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Últimas Actividades -->
-            <div class="card">
+        <div class="col-lg-4 d-flex justify-content-end align-items-start">
+            <!-- Últimas Actividades (alineada a la derecha y sticky) -->
+            <div class="card ultimas-actividades">
                 <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">
                         <i class="bi bi-clock-history"></i>
@@ -152,11 +173,11 @@
                         <i class="bi bi-arrow-right"></i> Ver todas
                     </a>
                 </div>
-                <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
                     {% if ultimas_actividades %}
                         <div class="list-group list-group-flush">
                             {% for actividad in ultimas_actividades %}
-                            <div class="list-group-item">
+                            <div class="list-group-item py-2">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="flex-grow-1">
                                         <h6 class="mb-1">{{ actividad.get_tipo_accion_display }}</h6>
@@ -173,7 +194,7 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <div class="text-center py-3">
+                        <div class="text-center py-2">
                             <i class="bi bi-clock-history text-muted" style="font-size: 1.5rem;"></i>
                             <p class="text-muted mt-1 mb-0 small">No hay actividades</p>
                         </div>
