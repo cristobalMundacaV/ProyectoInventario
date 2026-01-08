@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load format_numbers %}
+{% load format_numbers tz %}
 
 {% block title %}Confirmar Cierre de Caja{% endblock %}
 
@@ -24,7 +24,7 @@
                     <div class="card mb-4">
                         <div class="card-header bg-primary text-white">
                             <h5 class="mb-0">
-                                Caja {{ caja_data.caja.id }} - {{ caja_data.caja.fecha }}
+                                Caja {{ caja_data.caja.id }} - {{ caja_data.caja.fecha|date:"d/m/Y" }}
                                 <span class="badge bg-warning text-dark">Abierta</span>
                             </h5>
                         </div>
@@ -35,11 +35,11 @@
                                     <table class="table table-sm">
                                         <tr>
                                             <td><strong>Fecha:</strong></td>
-                                            <td>{{ caja_data.caja.fecha }}</td>
+                                            <td>{{ caja_data.caja.fecha|date:"d/m/Y" }}</td>
                                         </tr>
                                         <tr>
                                             <td><strong>Apertura:</strong></td>
-                                            <td>{{ caja_data.caja.hora_apertura|date:"H:i" }}</td>
+                                            <td>{{ caja_data.caja.hora_apertura|localtime|date:"H:i" }}</td>
                                         </tr>
                                         <tr>
                                             <td><strong>Monto Inicial:</strong></td>
@@ -97,7 +97,7 @@
                                                 {% for venta in caja_data.ventas %}
                                                 <tr>
                                                     <td>{{ venta.id }}</td>
-                                                    <td>{{ venta.fecha|date:"H:i" }}</td>
+                                                    <td>{{ venta.fecha|localtime|date:"H:i" }}</td>
                                                     <td>{{ venta.usuario.username }}</td>
                                                     <td>{{ venta.get_metodo_pago_display }}</td>
                                                     <td>${{ venta.total|format_decimal:2 }}</td>

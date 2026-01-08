@@ -16,8 +16,11 @@ def home(request):
         ultima_caja = Caja.objects.filter(abierta=True).order_by('-hora_apertura').first()
         if ultima_caja:
             ventas_hoy = Venta.objects.filter(caja=ultima_caja).count()
+            total_ventas = Venta.objects.filter(caja=ultima_caja).aggregate(total_sum=Sum('total'))['total_sum'] or 0
         else:
             ventas_hoy = 0
+            # No hay caja abierta: mostrar total 0 (reiniciar total mostrado)
+            total_ventas = 0
         
         # Productos con stock bajo
         productos_stock_bajo = Producto.objects.filter(stock_minimo__gt=0).count()
@@ -34,6 +37,7 @@ def home(request):
 
         context = {
             'ventas_hoy': ventas_hoy,
+            'total_ventas': total_ventas,
             'productos_stock_bajo': productos_stock_bajo,
             'caja_abierta': caja_abierta,
             'cajas_abiertas_count': cajas_abiertas_count,

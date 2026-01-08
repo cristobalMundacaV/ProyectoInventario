@@ -49,7 +49,7 @@
                             <tfoot class="table-light">
                                 <tr>
                                     <th colspan="5" class="text-end">TOTAL:</th>
-                                    <th id="totalAmount">$0.00</th>
+                                            <th id="totalAmount">$0</th>
                                     <th></th>
                                 </tr>
                             </tfoot>
@@ -198,10 +198,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             row.innerHTML = '<td>' + product.codigo_barra + '</td>' +
                 '<td>' + product.nombre + '</td>' +
-                '<td>$' + formatDecimal(product.precio_venta, 2) + '</td>' +
+                '<td>$' + formatDecimal(product.precio_venta, 0) + '</td>' +
                 '<td data-field="cantidad">' + formatQuantity(quantity) + '</td>' +
                 '<td data-field="unidad">' + unidadDisplay + '</td>' +
-                '<td data-field="subtotal">$' + formatDecimal(subtotal, 2) + '</td>' +
+                '<td data-field="subtotal">$' + formatDecimal(subtotal, 0) + '</td>' +
                 '<td><button type="button" class="btn btn-sm btn-outline-danger remove-product" style="border-radius: 999px;"><i class="bi bi-trash"></i></button></td>';
             
             tbody.appendChild(row);
@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const price = parseFloat(row.cells[2].textContent.replace('$', '')) || 0;
         const quantity = parseFloat(row.cells[3].textContent) || 0;
         const subtotal = (price * quantity);
-        row.cells[5].textContent = '$' + formatDecimal(subtotal, 2);
+        row.cells[5].textContent = '$' + formatDecimal(subtotal, 0);
     }
 
     function updateTotal() {
@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const subtotal = parseFloat(row.cells[5].textContent.replace('$', '')) || 0;
             total += subtotal;
         }
-        document.getElementById('totalAmount').textContent = '$' + formatDecimal(total, 2);
+        document.getElementById('totalAmount').textContent = '$' + formatDecimal(total, 0);
     }
 
     function attachRowEvents(row) {

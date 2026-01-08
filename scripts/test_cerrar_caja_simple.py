@@ -39,7 +39,7 @@ print('Producto1:', p1.id, 'margen_ganancia:', p1.margen_ganancia)
 v1 = Venta.objects.create(total=Decimal('20.00'), metodo_pago='EFECTIVO', usuario=user, caja=caja)
 VentaDetalle.objects.create(venta=v1, producto=p1, cantidad_ingresada=Decimal('2'), unidad_venta='UNIDAD', cantidad_base=Decimal('2'), precio_unitario=p1.precio_venta, subtotal=Decimal('20.00'))
 
-v2 = Venta.objects.create(total=Decimal('15.00'), metodo_pago='DEBITO', usuario=user, caja=caja)
+v2 = Venta.objects.create(total=Decimal('15.00'), metodo_pago='TARJETA', usuario=user, caja=caja)
 VentaDetalle.objects.create(venta=v2, producto=p1, cantidad_ingresada=Decimal('1.5'), unidad_venta='UNIDAD', cantidad_base=Decimal('1.5'), precio_unitario=p1.precio_venta, subtotal=Decimal('15.00'))
 
 print('Ventas creadas:', v1.id, v2.id)
@@ -58,7 +58,7 @@ for v in ventas:
     total_vendido += D(str(v.total))
     if v.metodo_pago == 'EFECTIVO':
         total_efectivo += D(str(v.total))
-    elif v.metodo_pago == 'DEBITO':
+    elif v.metodo_pago == 'TARJETA':
         total_debito += D(str(v.total))
     elif v.metodo_pago == 'TRANSFERENCIA':
         total_transferencia += D(str(v.total))

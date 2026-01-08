@@ -12,6 +12,7 @@ from inventario.models import Producto
 from .models import Venta, VentaDetalle
 from .forms import VentaForm, VentaDetalleFormSet
 from auditoria.models import Actividad
+from inventario.templatetags.format_numbers import format_money
 
 
 def venta_list(request):
@@ -29,7 +30,7 @@ def venta_create(request):
     
     if not caja_activa:
         messages.error(request, 'No hay una caja abierta. Por favor, abra una caja primero.')
-        return redirect('caja_list')
+        return redirect('home')
     
     metodo_choices = MetodoPago.choices
     unidad_choices = UnidadVenta.choices
@@ -124,7 +125,19 @@ def venta_create(request):
 
             # Registrar actividad (defensivo, por si el signal no se ejecuta o se omitió)
             try:
-                descr = f'Venta {venta.id} total ${venta.total} ({venta.metodo_pago})'
+                # Debug: log venta total raw to detect scale issues
+                try:
+                    print(f"DEBUG_VENTA Venta {venta.id} total (raw): {venta.total}")
+                except Exception:
+                    print("DEBUG_VENTA Venta unknown total")
+
+                # Format the total for consistent display (thousands separator, no decimals)
+                try:
+                    venta_total_fmt = format_money(venta.total)
+                except Exception:
+                    venta_total_fmt = str(venta.total)
+
+                descr = f'Venta {venta.id} total ${venta_total_fmt} ({venta.metodo_pago})'
                 if not Actividad.objects.filter(tipo_accion='VENTA', caja=caja_activa, descripcion__icontains=f'Venta {venta.id}').exists():
                     Actividad.objects.create(
                         usuario=usuario_actual,
@@ -156,7 +169,7 @@ def venta_create(request):
                 producto.save()
 
             messages.success(request, 'Venta creada exitosamente.')
-            return redirect('venta_list')
+            return redirect('home')
 
     else:
         vform = VentaForm(metodo_choices=metodo_choices)

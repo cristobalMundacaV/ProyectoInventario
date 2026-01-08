@@ -7,6 +7,7 @@ from decimal import Decimal
 from .models import Caja
 from .forms import AperturaCajaForm
 from auditoria.models import Actividad
+from inventario.templatetags.format_numbers import format_money
 
 @login_required
 def caja_list(request):
@@ -66,14 +67,19 @@ def abrir_caja(request):
                 abierta_por=request.user
             )
             # Registrar actividad de apertura de caja
+            try:
+                monto_fmt = format_money(monto_inicial)
+            except Exception:
+                monto_fmt = str(monto_inicial)
+
             Actividad.objects.create(
                 usuario=request.user,
                 tipo_accion='APERTURA_CAJA',
-                descripcion=f'Caja abierta con monto inicial ${monto_inicial}',
+                descripcion=f'Caja abierta con monto inicial ${monto_fmt}',
                 caja=caja
             )
 
-            messages.success(request, f'Caja abierta exitosamente con monto inicial de ${monto_inicial}.')
+            messages.success(request, f'Caja abierta exitosamente con monto inicial de ${monto_fmt}.')
             next_url = request.GET.get('next', 'home')
             return redirect(next_url)
     else:
@@ -106,7 +112,8 @@ def confirmar_cerrar_caja(request):
             total_vendido += Decimal(str(v.total))
             if v.metodo_pago == 'EFECTIVO':
                 total_efectivo += Decimal(str(v.total))
-            elif v.metodo_pago == 'TARJETA':
+            elif v.metodo_pago in ('TARJETA', 'DEBITO'):
+                # Aceptar tanto el valor actual 'TARJETA' como registros antiguos 'DEBITO'
                 total_tarjeta += Decimal(str(v.total))
             elif v.metodo_pago == 'TRANSFERENCIA':
                 total_transferencia += Decimal(str(v.total))
@@ -151,32 +158,66 @@ def cerrar_caja(request):
                 ganancia = Decimal('0.00')
 
                 for v in ventas:
+                    # Debug log: show each venta total to detect scaling issues
+                    try:
+                        print(f"DEBUG_CIERRE Venta {v.id} total (raw): {v.total}")
+                    except Exception:
+                        print("DEBUG_CIERRE Venta unknown total")
                     total_vendido += Decimal(str(v.total))
                     if v.metodo_pago == 'EFECTIVO':
                         total_efectivo += Decimal(str(v.total))
-                    elif v.metodo_pago == 'TARJETA':
+                    elif v.metodo_pago in ('TARJETA', 'DEBITO'):
+                        # Aceptar tanto el valor actual 'TARJETA' como registros antiguos 'DEBITO'
                         total_tarjeta += Decimal(str(v.total))
                     elif v.metodo_pago == 'TRANSFERENCIA':
                         total_transferencia += Decimal(str(v.total))
 
-                    # Ganancia por cada detalle: margen * cantidad_base
+                    # Ganancia por cada detalle: (precio_venta - precio_compra_real) * cantidad_base
                     for det in v.detalles.all():
-                        margen = det.producto.margen_ganancia or 0
-                        ganancia += Decimal(str(margen)) * Decimal(str(det.cantidad_base))
+                        producto = det.producto
+                        if producto:
+                            precio_compra_real = Decimal('0.00')
+                            
+                            if producto.tipo_producto == 'PACK' and producto.unidades_por_pack:
+                                # Para PACK: precio_compra / unidades_por_pack
+                                precio_compra_real = Decimal(str(producto.precio_compra)) / Decimal(str(producto.unidades_por_pack))
+                            elif producto.tipo_producto == 'GRANEL' and producto.kg_por_caja:
+                                # Para GRANEL: precio_compra / kg_por_caja
+                                precio_compra_real = Decimal(str(producto.precio_compra)) / Decimal(str(producto.kg_por_caja))
+                            else:
+                                # Para UNITARIO: precio_compra directamente
+                                precio_compra_real = Decimal(str(producto.precio_compra))
+                            
+                            ganancia += (Decimal(str(det.precio_unitario)) - precio_compra_real) * Decimal(str(det.cantidad_base))
 
                 caja.total_vendido = total_vendido
                 caja.total_efectivo = total_efectivo
-                caja.total_tarjeta = total_tarjeta
+                caja.total_debito = total_tarjeta
                 caja.total_transferencia = total_transferencia
                 caja.ganancia_diaria = ganancia
 
                 caja.save()
 
-                # Registrar actividad de cierre de caja
+                # Debug: log computed totals
+                try:
+                    print(f"DEBUG_CIERRE Caja {caja.id} total_vendido (Decimal): {total_vendido}")
+                except Exception:
+                    print("DEBUG_CIERRE Caja total_vendido unknown")
+
+                # Registrar actividad de cierre de caja (formatear total para mostrar miles)
+                # Use centralized formatting helper to avoid inconsistencies
+                try:
+                    total_fmt = format_money(total_vendido)
+                except Exception:
+                    try:
+                        total_fmt = str(int(total_vendido.quantize(Decimal('1'))))
+                    except Exception:
+                        total_fmt = str(total_vendido)
+
                 Actividad.objects.create(
                     usuario=request.user,
                     tipo_accion='CIERRE_CAJA',
-                    descripcion=f'Caja cerrada. Total vendido: ${total_vendido}',
+                    descripcion=f'Caja cerrada. Total vendido: ${total_fmt}',
                     caja=caja
                 )
 

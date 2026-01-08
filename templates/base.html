@@ -147,6 +147,79 @@
             border-color: #667eea;
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
+        /* Center all table headers and cells globally */
+        .table th, .table td {
+            text-align: center;
+            vertical-align: middle;
+        }
+        /* Use Ventas (primary) color for table headers */
+        .table thead th {
+            background-color: var(--bs-primary) !important;
+            color: #fff !important;
+            /* subtle bottom border and light shadow for separation */
+            border-bottom: 2px solid rgba(0,0,0,0.08);
+            box-shadow: inset 0 -6px 12px rgba(0,0,0,0.03);
+        }
+        /* Global reusable circular icon for headings/buttons */
+        .icon-circle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.12);
+            margin-right: 18px; /* más separación */
+            font-size: 18px;
+            border: 2px solid rgba(0,0,0,0.06);
+            color: inherit;
+        }
+        .icon-circle-sm {
+            width: 30px;
+            height: 30px;
+            font-size: 14px;
+            margin-right: 8px;
+        }
+        .icon-circle-lg {
+            width: 56px;
+            height: 56px;
+            font-size: 22px;
+            margin-right: 22px; /* margen mayor para la variante grande */
+            border-width: 3px;
+        }
+
+        /* Filter button: fully rounded pill and matching input height */
+        .btn-filter {
+            border-radius: 999px !important;
+            padding: 8px 14px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 40px !important; /* ajusta si necesitas otra altura */
+            min-height: 40px !important;
+            line-height: 1 !important;
+            box-sizing: border-box !important;
+        }
+        .btn.btn-filter { border-radius: 999px !important; }
+        .btn-filter:focus { box-shadow: none !important; }
+        /* Nuevo Producto: pill button with large radius (increased size) */
+        .btn-new-product {
+            border-radius: 99px !important;
+            padding: 10px 18px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            font-size: 1rem !important;
+            line-height: 1 !important;
+            box-sizing: border-box !important;
+        }
+        .btn.btn-new-product { border-radius: 99px !important; }
+        /* spacing between icon and text inside Nuevo Producto button */
+        .btn-new-product i {
+            margin-right: 10px !important;
+        }
     </style>
 </head>
 <body{% if not user.is_authenticated %} class="login-page"{% endif %}>
@@ -154,36 +227,13 @@
     <nav class="navbar navbar-expand-lg">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">
-                <i class="bi bi-currency-dollar"></i> Sistema
+                <i class="bi bi-currency-dollar"></i> Sistema de Gestión de Ventas e Inventario
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="inventarioDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-box"></i> Inventario
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'producto_list' %}">Productos</a></li>
-                            <!-- Puedes agregar más opciones aquí, por ejemplo:
-                            <li><a class="dropdown-item" href="#">Categorías</a></li>
-                            <li><a class="dropdown-item" href="#">Ingresos de Stock</a></li>
-                            -->
-                        </ul>
-                    </li>
 
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="ventasDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-currency-dollar"></i> Ventas
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'venta_list' %}">Ventas</a></li>
-                            <li><a class="dropdown-item" href="{% url 'venta_create' %}">Nueva Venta</a></li>
-                        </ul>
-                    </li>
-                </ul>
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">

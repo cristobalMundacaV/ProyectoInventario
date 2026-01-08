@@ -1,21 +1,16 @@
 from django.db import models
 from inventario.models import Producto
 from caja.models import Caja
+from core.enums import MetodoPago
 
 
 class Venta(models.Model):
-
-    METODO_PAGO_CHOICES = [
-        ('EFECTIVO', 'Efectivo'),
-        ('DEBITO', 'Débito'),
-        ('TRANSFERENCIA', 'Transferencia'),
-    ]
 
     fecha = models.DateTimeField(auto_now_add=True)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     metodo_pago = models.CharField(
         max_length=15,
-        choices=METODO_PAGO_CHOICES
+        choices=MetodoPago.choices
     )
     usuario = models.ForeignKey(
         'auth.User',

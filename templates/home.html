@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load tz %}
+{% load format_numbers %}
 
 {% block title %}Panel Principal{% endblock %}
 
@@ -81,7 +83,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
+                    <div class="row" style="align-items: center;">
                         <div class="col-md-6">
                             <div class="d-grid gap-2">
                                 <a href="{% url 'venta_create' %}" class="btn btn-success btn-lg">
@@ -95,9 +97,15 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="text-center"> 
-                                <h6 class="text-muted">Ventas del Día</h6>
-                                <h3 class="text-primary">{{ ventas_hoy|default:0 }}</h3>
+                            <div style="display: flex; align-items: center; gap: 1rem; justify-content: flex-end; margin-left: 20px; padding-right: 90px;">
+                                <div class="ms-3" style="display:flex;flex-direction:column;align-items:center;">
+                                    <h6 class="text-muted mb-1">Ventas del Día</h6>
+                                    <h3 class="text-primary mb-0">{{ ventas_hoy|default:0 }}</h3>
+                                </div>
+                                <div style="display:flex;flex-direction:column;align-items:center;">
+                                    <h6 class="text-muted mb-1">Total (CLP)</h6>
+                                    <h3 class="text-success mb-0">${{ total_ventas|format_money }}</h3>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -181,13 +189,13 @@
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="flex-grow-1">
                                         <h6 class="mb-1">{{ actividad.get_tipo_accion_display }}</h6>
-                                        <p class="mb-1 small text-muted">{{ actividad.descripcion|truncatechars:30 }}</p>
+                                        <p class="mb-1 small text-muted">{{ actividad.descripcion|strip_decimals_in_text|truncatechars:80 }}</p>
                                         <small class="text-muted">
                                             <i class="bi bi-person"></i> {{ actividad.usuario.username }}
                                         </small>
                                     </div>
                                     <small class="text-muted">
-                                        {{ actividad.fecha_hora|date:"H:i" }}
+                                        {{ actividad.fecha_hora|localtime|date:"H:i" }}
                                     </small>
                                 </div>
                             </div>

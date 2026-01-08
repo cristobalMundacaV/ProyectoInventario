@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% load format_numbers %}
+{% extends 'base.html' %}{% load format_numbers tz %}
 {% block titulo %}Cajas{% endblock %}
 
 {% block contenido %}
@@ -75,7 +75,7 @@
                         <th>Hora Cierre</th>
                         <th>Total Vendido</th>
                         <th>Efectivo</th>
-                        <th>Débito</th>
+                        <th>Tarjeta</th>
                         <th>Transferencia</th>
                         <th>Ganancia</th>
                         <th class="text-center">Acciones</th>
@@ -84,16 +84,16 @@
                 <tbody>
                     {% for caja in cajas %}
                     <tr>
-                        <td>{{ caja.fecha }}</td>
+                        <td>{{ caja.fecha|date:"d/m/Y" }}</td>
                         <td>{% if caja.abierta %}<span class="badge bg-success">Abierta</span>{% else %}<span class="badge bg-danger">Cerrada</span>{% endif %}</td>
                         <td>${{ caja.monto_inicial|format_decimal:2 }}</td>
-                        <td>{{ caja.hora_apertura|date:"H:i" }}</td>
-                        <td>{% if caja.hora_cierre %}{{ caja.hora_cierre|date:"H:i" }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                        <td>{{ caja.hora_apertura|localtime|date:"H:i" }}</td>
+                        <td>{% if caja.hora_cierre %}{{ caja.hora_cierre|localtime|date:"H:i" }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
                         <td>${{ caja.total_vendido|format_decimal:2 }}</td>
                         <td>${{ caja.total_efectivo|format_decimal:2 }}</td>
                         <td>${{ caja.total_debito|format_decimal:2 }}</td>
                         <td>${{ caja.total_transferencia|format_decimal:2 }}</td>
-                        <td>${{ caja.ganancia_diaria|format_decimal:2 }}</td>
+                        <td>${{ caja.ganancia_diaria|format_decimal:0}}</td>
                         <td class="text-center">
                             <a href="{% url 'caja_detail' caja.id %}" class="btn btn-outline-info btn-sm" title="Ver"><i class="bi bi-eye"></i></a>
                         </td>
