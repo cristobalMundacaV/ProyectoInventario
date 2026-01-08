@@ -1,0 +1,55 @@
+{% load format_numbers tz %}
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Comprobante Venta {{ venta.id }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; }
+        .ticket { width: 300px; margin: 0 auto; }
+        .center { text-align: center; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 4px 0; }
+        .text-right { text-align: right; }
+        .bold { font-weight: bold; }
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="ticket">
+    <div class="center">
+        <h3>Comprobante Venta</h3>
+        <p>#{{ venta.id }}</p>
+        <p>{{ venta.fecha|localtime|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr><th>Producto</th><th class="text-right">Cant</th><th class="text-right">Subtotal</th></tr>
+        </thead>
+        <tbody>
+            {% for det in venta.detalles.all %}
+            <tr>
+                <td>{{ det.producto }}</td>
+                <td class="text-right">{{ det.cantidad_ingresada|format_decimal:3 }}</td>
+                <td class="text-right">${{ det.subtotal|format_decimal:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr><td class="bold">TOTAL</td><td></td><td class="text-right bold">${{ venta.total|format_decimal:2 }}</td></tr>
+            <tr><td colspan="3">Método: {{ venta.get_metodo_pago_display }}</td></tr>
+        </tfoot>
+    </table>
+
+    <div class="center mt-3">
+        <p class="no-print"><a href="javascript:window.print();" class="btn">Imprimir</a></p>
+    </div>
+    <div class="center" style="margin-top:8px;">
+        <p style="font-size:11px; font-weight:700; margin:0;">Sistema de Gestion de Ventas e Inventario</p>
+    </div>
+</div>
+</body>
+</html>

@@ -13,18 +13,21 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                      <th>Fecha</th>
-                      <th>Total</th>
-                      <th>Método</th>
-                      <th>Usuario</th>
-                      <th>Caja</th>
-                    </tr>
-                </thead>
+                                <thead class="table-light">
+                                        <tr>
+                                              <th class="text-center">ID</th>
+                                            <th>Fecha</th>
+                                            <th>Total</th>
+                                            <th>Método</th>
+                                            <th>Usuario</th>
+                                            <th>Caja</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                </thead>
                 <tbody>
                     {% for venta in ventas %}
                     <tr id="venta-{{ venta.id }}">
+                                              <td class="text-center">{{ venta.id }}</td>
                       <td>{{ venta.fecha|localtime|date:"d/m/Y H:i" }}</td>
                       <td>${{ venta.total|format_decimal:2 }}</td>
                       <td>{{ venta.get_metodo_pago_display }}</td>
@@ -35,6 +38,10 @@
                                                 {% else %}
                                                     -
                                                 {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'venta_detail' venta.id %}" class="btn btn-sm btn-outline-primary">Ver</a>
+                                                <a href="{% url 'venta_comprobante' venta.id %}" target="_blank" class="btn btn-sm btn-outline-secondary">Boleta</a>
                                             </td>
                     </tr>
                     {% empty %}

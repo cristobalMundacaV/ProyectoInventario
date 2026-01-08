@@ -94,7 +94,7 @@
                                     <i class="bi bi-list"></i>
                                     Ver Ventas
                                 </a>
-                            </div>
+                                </div>
                         </div>
                         <div class="col-md-6">
                             <div style="display: flex; align-items: center; gap: 1rem; justify-content: flex-end; margin-left: 20px; padding-right: 90px;">
@@ -107,6 +107,13 @@
                                     <h3 class="text-success mb-0">${{ total_ventas|format_money }}</h3>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                
+                    <div class="mt-3">
+                        <div class="input-group">
+                            <input id="comprobante-id" type="number" min="1" class="form-control" placeholder="ID venta" aria-label="ID venta">
+                            <button id="go-comprobante" class="btn btn-outline-primary ms-2" type="button">Ir a boleta</button>
                         </div>
                     </div>
                 </div>
@@ -212,4 +219,15 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('go-comprobante')?.addEventListener('click', function(){
+    var id = document.getElementById('comprobante-id').value;
+    if(!id){ alert('Ingrese el ID de la venta'); return; }
+    // Redirect to comprobante URL
+    window.location.href = '/ventas/' + id + '/comprobante/';
+});
+</script>
 {% endblock %}

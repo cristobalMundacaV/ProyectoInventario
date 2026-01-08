@@ -13,11 +13,28 @@ from .models import Venta, VentaDetalle
 from .forms import VentaForm, VentaDetalleFormSet
 from auditoria.models import Actividad
 from inventario.templatetags.format_numbers import format_money
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.decorators import login_required
 
 
 def venta_list(request):
     ventas = Venta.objects.order_by('-fecha')[:50]
     return render(request, 'ventas/venta_list.html', {'ventas': ventas})
+
+
+@login_required
+def venta_detail(request, pk):
+    """Muestra detalle de una venta (productos, cantidades, precios, subtotales, total, método, fecha)."""
+    venta = get_object_or_404(Venta.objects.select_related('usuario', 'caja').prefetch_related('detalles__producto'), pk=pk)
+    return render(request, 'ventas/venta_detail.html', {'venta': venta})
+
+
+@login_required
+def venta_comprobante(request, pk):
+    """Renderiza un comprobante/boleta imprimible para la venta."""
+    venta = get_object_or_404(Venta.objects.select_related('usuario', 'caja').prefetch_related('detalles__producto'), pk=pk)
+    # plantilla optimizada para impresión; el usuario puede usar Ctrl+P
+    return render(request, 'ventas/venta_comprobante.html', {'venta': venta})
 
 
 @transaction.atomic
