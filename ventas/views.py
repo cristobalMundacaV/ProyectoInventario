@@ -5,6 +5,8 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 import json
 from django.utils.safestring import mark_safe
+from django.utils import timezone
+from datetime import timedelta
 
 from core.enums import MetodoPago, UnidadVenta
 from caja.models import Caja
@@ -12,7 +14,7 @@ from inventario.models import Producto
 from .models import Venta, VentaDetalle
 from .forms import VentaForm, VentaDetalleFormSet
 from auditoria.models import Actividad
-from inventario.templatetags.format_numbers import format_money
+from inventario.templatetags.format_numbers import format_money, format_decimal
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 
@@ -230,6 +232,47 @@ def venta_create(request):
                 producto = detalle_data['producto']
                 producto.stock_actual_base -= detalle_data['cantidad_base']
                 producto.save()
+                # Si el stock queda por debajo o igual al mínimo, generar actividad de alerta
+                try:
+                    if producto.stock_minimo is not None and producto.stock_actual_base is not None and producto.stock_actual_base <= producto.stock_minimo:
+                        # Evitar duplicados iguales en la misma caja
+                        # Usar las propiedades de producto para formatear según tipo (GRANEL vs UNIDAD/PACK)
+                        prod_name = str(producto.nombre).lower()
+                        try:
+                            sd = producto.stock_display
+                            if isinstance(sd, str) and ' ' in sd:
+                                # e.g. '100.000 kg' -> format numeric part
+                                parts = sd.rsplit(' ', 1)
+                                sd_num = format_decimal(parts[0])
+                                actual_display = f"{sd_num} {parts[1]}"
+                            else:
+                                actual_display = format_decimal(sd)
+                        except Exception:
+                            actual_display = format_decimal(producto.stock_actual_base)
+                        try:
+                            smd = producto.stock_minimo_display
+                            if isinstance(smd, str) and ' ' in smd:
+                                parts = smd.rsplit(' ', 1)
+                                smd_num = format_decimal(parts[0])
+                                minimo_display = f"{smd_num} {parts[1]}"
+                            else:
+                                minimo_display = format_decimal(smd)
+                        except Exception:
+                            minimo_display = format_decimal(producto.stock_minimo)
+                        descr = f'Stock bajo: {prod_name} = {actual_display} (mínimo {minimo_display})'
+                        # Only skip if a STOCK_BAJO for this product exists in the same caja within the last hour
+                        try:
+                            Actividad.objects.create(
+                                usuario=usuario_actual,
+                                tipo_accion='STOCK_BAJO',
+                                descripcion=descr,
+                                caja=caja_activa
+                            )
+                            print(f"DEBUG_ACTIVIDAD: Created STOCK_BAJO for {prod_name} in caja {caja_activa}")
+                        except Exception as e:
+                            print(f"DEBUG_ACTIVIDAD: Failed to create STOCK_BAJO for {prod_name}: {e}")
+                except Exception:
+                    pass
 
             # En lugar de redirigir inmediatamente, mostrar confirmación con opción de imprimir boleta
             return render(request, 'ventas/venta_confirm_print.html', {

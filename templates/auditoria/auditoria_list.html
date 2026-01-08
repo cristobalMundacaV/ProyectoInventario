@@ -41,6 +41,8 @@
                                         <span class="badge bg-primary">Venta</span>
                                         {% elif actividad.tipo_accion == 'INGRESO_STOCK' %}
                                         <span class="badge bg-info">Ingreso Stock</span>
+                                        {% elif actividad.tipo_accion == 'STOCK_BAJO' %}
+                                        <span class="badge bg-danger">Stock Bajo</span>
                                         {% elif actividad.tipo_accion == 'CREACION_PRODUCTO' %}
                                         <span class="badge bg-warning">Creación Producto</span>
                                         {% elif actividad.tipo_accion == 'CREACION_CATEGORIA' %}

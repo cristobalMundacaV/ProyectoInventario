@@ -4,8 +4,11 @@ from django.db.models.deletion import ProtectedError
 from django.contrib import messages
 from .models import Producto, Categoria
 from .forms import ProductoForm, AnadirStockForm
+from inventario.templatetags.format_numbers import format_decimal
 from auditoria.models import Actividad
 from caja.models import Caja
+from decimal import Decimal
+from django.db.models import F
 
 
 # --- Vista para añadir stock ---
@@ -18,12 +21,63 @@ def anadir_stock(request):
             cantidad = form.cleaned_data['cantidad']
             producto.stock_actual_base = (producto.stock_actual_base or 0) + cantidad
             producto.save()
-            messages.success(request, f'Se añadió {cantidad} al stock de {producto.nombre}. Stock actual: {producto.stock_actual_base} {"kg" if producto.tipo_producto == "GRANEL" else "unidades"}')
+            # Formatear cantidades para mostrar sin ceros innecesarios
+            if producto.tipo_producto == 'GRANEL':
+                unidad_label = 'kg'
+                stock_unit_label = 'kg'
+            else:
+                unidad_label = 'unidad' if cantidad == Decimal('1') else 'unidades'
+                # Para el stock actual, decidir plural según el valor actual del stock
+                stock_unit_label = 'unidad' if (producto.stock_actual_base == Decimal('1')) else 'unidades'
+            cantidad_display = format_decimal(cantidad)
+            stock_display = format_decimal(producto.stock_actual_base)
+            messages.success(request, f'Se añadió {cantidad_display} {unidad_label} al stock de {producto.nombre}. Stock actual: {stock_display} {stock_unit_label}')
+            # Registrar actividad de ingreso de stock con unidad adecuada
+            if producto.tipo_producto == 'GRANEL':
+                unidad_label = 'kg'
+            else:
+                unidad_label = 'unidad' if cantidad == Decimal('1') else 'unidades'
+            Actividad.objects.create(
+                usuario=request.user,
+                tipo_accion='INGRESO_STOCK',
+                descripcion=f'Se añadió {cantidad_display} {unidad_label} al stock de {producto.nombre}',
+                caja=(Caja.objects.filter(abierta=True).order_by('-hora_apertura').first())
+            )
             if 'add_another' in request.POST:
                 return redirect('anadir_stock')
             return redirect('producto_list')
     else:
         form = AnadirStockForm()
+    # If reached here due to invalid POST, or GET, decide rendering
+    if request.method == 'POST' and not form.is_valid():
+        # Re-render the producto list with the form errors inside the modal
+        nombre = request.GET.get('nombre', '')
+        categoria = request.GET.get('categoria', '')
+        codigo_barra = request.GET.get('codigo_barra', '')
+
+        productos = Producto.objects.all()
+        if nombre:
+            productos = productos.filter(nombre__icontains=nombre)
+        if categoria:
+            productos = productos.filter(categoria_id=categoria)
+        if codigo_barra:
+            productos = productos.filter(codigo_barra__icontains=codigo_barra)
+
+        categorias = Categoria.objects.all()
+        categoria_form = CategoriaForm()
+        return render(request, 'inventario/producto_list.html', {
+            'productos': productos,
+            'categorias': categorias,
+            'filtros': {
+                'nombre': nombre,
+                'categoria': categoria,
+                'codigo_barra': codigo_barra,
+            },
+            'categoria_form': categoria_form,
+            'anadir_stock_form': form,
+            'open_modal': 'anadir_stock',
+        })
+
     return render(request, 'inventario/anadir_stock_form.html', {'form': form})
 
 
@@ -45,11 +99,48 @@ def categoria_create(request):
     if request.method == 'POST':
         form = CategoriaForm(request.POST)
         if form.is_valid():
-            form.save()
+            categoria = form.save()
             messages.success(request, 'Categoría creada correctamente.')
+            # Registrar actividad de creación de categoría
+            Actividad.objects.create(
+                usuario=request.user,
+                tipo_accion='CREACION_CATEGORIA',
+                descripcion=f'Categoría creada: {categoria.nombre}',
+                caja=(Caja.objects.filter(abierta=True).order_by('-hora_apertura').first())
+            )
             return redirect('producto_list')
     else:
         form = CategoriaForm()
+
+    if request.method == 'POST' and not form.is_valid():
+        # Re-render producto list with category form errors and open modal
+        nombre = request.GET.get('nombre', '')
+        categoria = request.GET.get('categoria', '')
+        codigo_barra = request.GET.get('codigo_barra', '')
+
+        productos = Producto.objects.all()
+        if nombre:
+            productos = productos.filter(nombre__icontains=nombre)
+        if categoria:
+            productos = productos.filter(categoria_id=categoria)
+        if codigo_barra:
+            productos = productos.filter(codigo_barra__icontains=codigo_barra)
+
+        categorias = Categoria.objects.all()
+        anadir_stock_form = AnadirStockForm()
+        return render(request, 'inventario/producto_list.html', {
+            'productos': productos,
+            'categorias': categorias,
+            'filtros': {
+                'nombre': nombre,
+                'categoria': categoria,
+                'codigo_barra': codigo_barra,
+            },
+            'categoria_form': form,
+            'anadir_stock_form': anadir_stock_form,
+            'open_modal': 'categoria',
+        })
+
     return render(request, 'inventario/categoria_form.html', {'form': form})
 
 @login_required
@@ -57,6 +148,7 @@ def producto_list(request):
     nombre = request.GET.get('nombre', '')
     categoria = request.GET.get('categoria', '')
     codigo_barra = request.GET.get('codigo_barra', '')
+    bajo_stock_flag = request.GET.get('bajo_stock')
 
     productos = Producto.objects.all()
     if nombre:
@@ -66,7 +158,22 @@ def producto_list(request):
     if codigo_barra:
         productos = productos.filter(codigo_barra__icontains=codigo_barra)
 
+    # Si se pidió filtrar por bajo stock, limitar el queryset
+    if bajo_stock_flag:
+        # Considerar sólo productos con stock_minimo > 0 y stock_actual_base <= stock_minimo
+        productos = productos.filter(stock_minimo__gt=0).filter(stock_actual_base__lte=F('stock_minimo'))
+
     categorias = Categoria.objects.all()
+    # Mark products that are at or below minimum stock for the template
+    for p in productos:
+        try:
+            p.bajo_stock = (p.stock_actual_base is not None and p.stock_minimo is not None and p.stock_actual_base <= p.stock_minimo)
+        except Exception:
+            p.bajo_stock = False
+    # Instanciar formularios para mostrarlos en la vista de lista (modales)
+    categoria_form = CategoriaForm()
+    anadir_stock_form = AnadirStockForm()
+
     return render(request, 'inventario/producto_list.html', {
         'productos': productos,
         'categorias': categorias,
@@ -74,7 +181,10 @@ def producto_list(request):
             'nombre': nombre,
             'categoria': categoria,
             'codigo_barra': codigo_barra,
-        }
+            'bajo_stock': bool(bajo_stock_flag),
+        },
+        'categoria_form': categoria_form,
+        'anadir_stock_form': anadir_stock_form,
     })
 
 @login_required
@@ -94,6 +204,49 @@ def producto_create(request):
             return redirect('producto_list')
     else:
         producto_form = ProductoForm()
+
+    # Ensure stock fields use integer step and integer initial values when tipo != GRANEL
+    tipo = None
+    if producto_form.instance and getattr(producto_form.instance, 'tipo_producto', None):
+        tipo = producto_form.instance.tipo_producto
+    elif producto_form.is_bound:
+        tipo = producto_form.data.get('tipo_producto')
+
+    if tipo != 'GRANEL':
+        for fname in ('stock_minimo', 'stock_actual_base'):
+            if fname in producto_form.fields:
+                producto_form.fields[fname].widget.attrs.update({'step': '1'})
+                if not producto_form.is_bound:
+                    val = getattr(producto_form.instance, fname, None)
+                    if val is not None:
+                        try:
+                            producto_form.initial[fname] = int(val)
+                        except Exception:
+                            producto_form.initial[fname] = val
+    else:
+        # Show decimals for stock fields
+        for fname in ('stock_minimo', 'stock_actual_base'):
+            if fname in producto_form.fields:
+                producto_form.fields[fname].widget.attrs.update({'step': '0.001'})
+                if not producto_form.is_bound:
+                    val = getattr(producto_form.instance, fname, None)
+                    if val is not None:
+                        try:
+                            producto_form.initial[fname] = f"{float(val):.3f}"
+                        except Exception:
+                            producto_form.initial[fname] = val
+
+    # Ensure precio_compra and precio_venta display as integers
+    for pname in ('precio_compra', 'precio_venta'):
+        if pname in producto_form.fields:
+            producto_form.fields[pname].widget.attrs.update({'step': '1'})
+            if not producto_form.is_bound:
+                val = getattr(producto_form.instance, pname, None)
+                if val is not None:
+                    try:
+                        producto_form.initial[pname] = int(val)
+                    except Exception:
+                        producto_form.initial[pname] = val
 
     return render(request, 'inventario/producto_form.html', {
         'form': producto_form,
@@ -121,6 +274,50 @@ def producto_update(request, pk):
             return redirect('producto_list')
     else:
         form = ProductoForm(instance=producto)
+    # Ensure stock fields use integer step and show integer values when product is not GRANEL.
+    tipo = None
+    if form.instance and getattr(form.instance, 'tipo_producto', None):
+        tipo = form.instance.tipo_producto
+    elif form.is_bound:
+        tipo = form.data.get('tipo_producto')
+
+    if tipo != 'GRANEL':
+        for fname in ('stock_minimo', 'stock_actual_base'):
+            if fname in form.fields:
+                form.fields[fname].widget.attrs.update({'step': '1'})
+                # For unbound forms, set initial to integer value from instance
+                if not form.is_bound:
+                    val = getattr(form.instance, fname, None)
+                    if val is not None:
+                        try:
+                            form.initial[fname] = int(val)
+                        except Exception:
+                            form.initial[fname] = val
+    else:
+        # Show decimals for stock fields when GRANEL
+        for fname in ('stock_minimo', 'stock_actual_base'):
+            if fname in form.fields:
+                form.fields[fname].widget.attrs.update({'step': '0.001'})
+                if not form.is_bound:
+                    val = getattr(form.instance, fname, None)
+                    if val is not None:
+                        try:
+                            form.initial[fname] = f"{float(val):.3f}"
+                        except Exception:
+                            form.initial[fname] = val
+
+    # Ensure precio_compra and precio_venta display as integers
+    for pname in ('precio_compra', 'precio_venta'):
+        if pname in form.fields:
+            form.fields[pname].widget.attrs.update({'step': '1'})
+            if not form.is_bound:
+                val = getattr(form.instance, pname, None)
+                if val is not None:
+                    try:
+                        form.initial[pname] = int(val)
+                    except Exception:
+                        form.initial[pname] = val
+
     return render(request, 'inventario/producto_form.html', {'form': form, 'accion': 'Editar'})
 
 @login_required

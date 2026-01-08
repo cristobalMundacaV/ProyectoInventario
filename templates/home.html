@@ -86,34 +86,36 @@
                     <div class="row" style="align-items: center;">
                         <div class="col-md-6">
                             <div class="d-grid gap-2">
-                                <a href="{% url 'venta_create' %}" class="btn btn-success btn-lg">
+                                <a href="{% url 'venta_create' %}" class="btn btn-success shadow btn-new-product">
                                     <i class="bi bi-plus"></i>
                                     Nueva Venta
                                 </a>
-                                <a href="{% url 'venta_list' %}" class="btn btn-info btn-lg">
+                                <a href="{% url 'venta_list' %}" class="btn btn-info shadow btn-new-product">
                                     <i class="bi bi-list"></i>
                                     Ver Ventas
                                 </a>
                                 </div>
                         </div>
                         <div class="col-md-6">
-                            <div style="display: flex; align-items: center; gap: 1rem; justify-content: flex-end; margin-left: 20px; padding-right: 90px;">
-                                <div class="ms-3" style="display:flex;flex-direction:column;align-items:center;">
-                                    <h6 class="text-muted mb-1">Ventas del Día</h6>
-                                    <h3 class="text-primary mb-0">{{ ventas_hoy|default:0 }}</h3>
-                                </div>
-                                <div style="display:flex;flex-direction:column;align-items:center;">
-                                    <h6 class="text-muted mb-1">Total (CLP)</h6>
-                                    <h3 class="text-success mb-0">${{ total_ventas|format_money }}</h3>
+                            <div class="d-flex align-items-center justify-content-md-end w-100">
+                                <div class="d-flex gap-3 align-items-center" style="margin-right:7rem;">
+                                    <div class="d-flex flex-column align-items-center">
+                                        <h6 class="text-muted mb-1">Ventas del Día</h6>
+                                        <h3 class="text-primary mb-0">{{ ventas_hoy|default:0 }}</h3>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-center">
+                                        <h6 class="text-muted mb-1">Total (CLP)</h6>
+                                        <h3 class="text-success mb-0">${{ total_ventas|format_money }}</h3>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 
                     <div class="mt-3">
-                        <div class="input-group">
+                            <div class="input-group">
                             <input id="comprobante-id" type="number" min="1" class="form-control" placeholder="ID venta" aria-label="ID venta">
-                            <button id="go-comprobante" class="btn btn-outline-primary ms-2" type="button">Ir a boleta</button>
+                            <button id="go-comprobante" class="btn btn-outline-primary shadow btn-new-product ms-2" type="button">Ir a boleta</button>
                         </div>
                     </div>
                 </div>
@@ -132,11 +134,11 @@
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <a href="{% url 'producto_list' %}" class="btn btn-outline-success w-100">
+                                <a href="{% url 'producto_list' %}" class="btn btn-outline-success shadow btn-new-product">
                                     <i class="bi bi-box-seam"></i>
                                     Productos
                                 </a>
-                                <a href="{% url 'producto_create' %}" class="btn btn-success w-100">
+                                <a href="{% url 'producto_create' %}" class="btn btn-success shadow btn-new-product">
                                     <i class="bi bi-plus"></i>
                                     Nuevo Producto
                                 </a>
@@ -155,17 +157,17 @@
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <a id="ver-cajas" href="{% url 'caja_list' %}" class="btn btn-outline-orange w-100" onclick="event.preventDefault(); console.log('ver-cajas clicked'); window.location.href=this.href;">
+                                <a id="ver-cajas" href="{% url 'caja_list' %}" class="btn btn-outline-orange shadow btn-new-product" onclick="event.preventDefault(); console.log('ver-cajas clicked'); window.location.href=this.href;">
                                     <i class="bi bi-cash"></i>
                                     Ver Cajas
                                 </a>
                                 {% if caja_abierta %}
-                                <a href="{% url 'confirmar_cerrar_caja' %}?next=home" class="btn btn-danger w-100">
+                                <a href="{% url 'confirmar_cerrar_caja' %}?next={% url 'home' %}" class="btn btn-danger shadow btn-new-product">
                                     <i class="bi bi-lock"></i>
                                     Cerrar Caja {% if cajas_abiertas_count > 1 %}({{ cajas_abiertas_count }}){% endif %}
                                 </a>
                                 {% else %}
-                                <a href="{% url 'abrir_caja' %}?next=home" class="btn btn-orange w-100">
+                                <a href="{% url 'abrir_caja' %}?next={% url 'home' %}" class="btn btn-orange shadow btn-new-product">
                                     <i class="bi bi-unlock"></i>
                                     Abrir Caja
                                 </a>
@@ -184,7 +186,7 @@
                         <i class="bi bi-clock-history"></i>
                         Últimas Actividades
                     </h6>
-                    <a href="{% url 'auditoria_list' %}" class="btn btn-sm btn-outline-light">
+                    <a href="{% url 'auditoria_list' %}" class="btn btn-outline-light shadow btn-new-product">
                         <i class="bi bi-arrow-right"></i> Ver todas
                     </a>
                 </div>
@@ -192,14 +194,16 @@
                     {% if ultimas_actividades %}
                         <div class="list-group list-group-flush">
                             {% for actividad in ultimas_actividades %}
-                            <div class="list-group-item py-2">
+                            <div class="list-group-item py-2 {% if actividad.tipo_accion == 'STOCK_BAJO' %}list-group-item-danger{% endif %}">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="flex-grow-1">
                                         <h6 class="mb-1">{{ actividad.get_tipo_accion_display }}</h6>
-                                        <p class="mb-1 small text-muted">{{ actividad.descripcion|strip_decimals_in_text|truncatechars:80 }}</p>
+                                        <p class="mb-1 small {% if actividad.tipo_accion == 'STOCK_BAJO' %}text-danger{% else %}text-muted{% endif %}">{{ actividad.descripcion|strip_decimals_in_text|truncatechars:80 }}</p>
+                                        {% if actividad.tipo_accion != 'STOCK_BAJO' %}
                                         <small class="text-muted">
                                             <i class="bi bi-person"></i> {{ actividad.usuario.username }}
                                         </small>
+                                        {% endif %}
                                     </div>
                                     <small class="text-muted">
                                         {{ actividad.fecha_hora|localtime|date:"H:i" }}

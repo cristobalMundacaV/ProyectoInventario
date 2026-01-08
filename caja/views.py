@@ -135,7 +135,8 @@ def confirmar_cerrar_caja(request):
             'ventas': ventas.order_by('-fecha')[:5]  # Últimas 5 ventas
         })
     
-    return render(request, 'caja/confirmar_cierre.html', {'cajas_datos': cajas_datos})
+    next_url = request.GET.get('next', '')
+    return render(request, 'caja/confirmar_cierre.html', {'cajas_datos': cajas_datos, 'next': next_url})
 
 @login_required
 def cerrar_caja(request):

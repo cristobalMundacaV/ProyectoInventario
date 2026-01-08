@@ -56,6 +56,7 @@
                                 {% else %}
                                     <div class="mb-3">
                                         <label class="form-label fw-semibold">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                                        {# Render field normally. Widget attributes (step/value) are handled in the view. #}
                                         {{ field }}
                                         {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
                                         {% for error in field.errors %}
@@ -118,7 +119,8 @@
                     function toggleFields() {
                         var tipo = document.getElementById('id_tipo_producto').value;
                         document.getElementById('field-unidades_por_pack').style.display = (tipo === 'PACK') ? 'block' : 'none';
-                        document.getElementById('field-kg_por_caja').style.display = (tipo === 'GRANEL') ? 'block' : 'none';
+                        // Hide "kg por caja" for GRANEL and UNITARIO; show otherwise
+                        document.getElementById('field-kg_por_caja').style.display = (tipo === 'GRANEL' || tipo === 'UNITARIO') ? 'none' : 'block';
                         document.getElementById('precio-unitario-pack-container').style.display = (tipo === 'PACK') ? 'block' : 'none';
                         document.getElementById('precio-kg-granel-container').style.display = (tipo === 'GRANEL') ? 'block' : 'none';
                         document.getElementById('margen-pack-container').style.display = (tipo === 'PACK') ? 'block' : 'none';
@@ -127,6 +129,11 @@
                         // Mostrar campos para cajas si corresponde
                         document.getElementById('field-cantidad_cajas').style.display = (tipo === 'CAJA') ? 'block' : 'none';
                         document.getElementById('stock-unidades-info').style.display = (tipo === 'CAJA') ? 'block' : 'none';
+                        // Ajustar step de inputs de stock según tipo
+                        var stockMin = document.getElementById('id_stock_minimo');
+                        var stockActual = document.getElementById('id_stock_actual_base');
+                        if (stockMin) stockMin.step = (tipo === 'GRANEL') ? '0.001' : '1';
+                        if (stockActual) stockActual.step = (tipo === 'GRANEL') ? '0.001' : '1';
                         calcularValores();
                         calcularStockUnidades();
                         mostrarStockEstimado();

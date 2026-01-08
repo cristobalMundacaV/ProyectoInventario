@@ -57,7 +57,12 @@
       </select>
     </div>
     <div class="col-md-3 d-grid">
-      <button type="submit" class="btn btn-primary btn-new-product"><i class="bi bi-search"></i> Filtrar</button>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-new-product"><i class="bi bi-search"></i> Filtrar</button>
+        <a href="{% url 'caja_list' %}" class="btn rounded-pill shadow btn-new-product btn-outline-secondary" title="Quitar filtros">
+          <i class="bi bi-x-circle me-1"></i> Limpiar filtros
+        </a>
+      </div>
     </div>
   </div>
 </form>
@@ -78,7 +83,7 @@
                         <th>Tarjeta</th>
                         <th>Transferencia</th>
                         <th>Ganancia</th>
-                        <th class="text-center">Acciones</th>
+                        
                     </tr>
                 </thead>
                 <tbody>
@@ -94,12 +99,10 @@
                         <td>${{ caja.total_debito|format_decimal:2 }}</td>
                         <td>${{ caja.total_transferencia|format_decimal:2 }}</td>
                         <td>${{ caja.ganancia_diaria|format_decimal:0}}</td>
-                        <td class="text-center">
-                            <a href="{% url 'caja_detail' caja.id %}" class="btn btn-outline-info btn-sm" title="Ver"><i class="bi bi-eye"></i></a>
-                        </td>
+                        
                     </tr>
                     {% empty %}
-                    <tr><td colspan="11" class="text-center text-muted">No hay cajas.</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted">No hay cajas.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

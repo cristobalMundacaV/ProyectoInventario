@@ -8,6 +8,7 @@ class Actividad(models.Model):
         ('CIERRE_CAJA', 'Cierre de Caja'),
         ('VENTA', 'Venta'),
         ('INGRESO_STOCK', 'Ingreso de Stock'),
+        ('STOCK_BAJO', 'Stock Bajo'),
         ('CREACION_PRODUCTO', 'Creación de Producto'),
         ('EDICION_PRODUCTO', 'Edición de Producto'),
         ('CREACION_CATEGORIA', 'Creación de Categoría'),
