@@ -10,7 +10,7 @@ class AperturaCajaForm(forms.ModelForm):
                 attrs={
                     'class': 'form-control',
                     'placeholder': 'Ingrese el monto inicial',
-                    'step': '1',
+                    'step': '0.01',
                     'min': '0'
                 }
             )
