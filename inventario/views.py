@@ -8,7 +8,7 @@ from inventario.templatetags.format_numbers import format_decimal
 from auditoria.models import Actividad
 from caja.models import Caja
 from decimal import Decimal
-from django.db.models import F
+from django.db.models import F, Sum, Q
 
 
 # --- Vista para añadir stock ---
@@ -83,6 +83,8 @@ def anadir_stock(request):
 
 # --- Vista para crear categoría ---
 from django import forms
+ 
+
 
 class CategoriaForm(forms.ModelForm):
     class Meta:
@@ -142,6 +144,32 @@ def categoria_create(request):
         })
 
     return render(request, 'inventario/categoria_form.html', {'form': form})
+
+@login_required
+def productos_vendidos(request):
+    """Lista de productos ordenada por unidades vendidas (mayor a menor).
+    Opcional: filtrar por rango de fechas con GET `start` y `end` (YYYY-MM-DD).
+    """
+    start = request.GET.get('start')
+    end = request.GET.get('end')
+
+    if start and end:
+        fecha_filter = Q(ventadetalle__venta__fecha__range=(start, end))
+        productos = Producto.objects.annotate(
+            total_vendido=Sum('ventadetalle__cantidad_base', filter=fecha_filter)
+        ).order_by('-total_vendido')
+    else:
+        productos = Producto.objects.annotate(
+            total_vendido=Sum('ventadetalle__cantidad_base')
+        ).order_by('-total_vendido')
+
+    categorias = Categoria.objects.all()
+    return render(request, 'inventario/producto_vendidos.html', {
+        'productos': productos,
+        'categorias': categorias,
+        'filtros': {'start': start, 'end': end},
+    })
+
 
 @login_required
 def producto_list(request):

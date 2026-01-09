@@ -10,4 +10,5 @@ urlpatterns = [
     path('productos/<int:pk>/desvincular/', views.producto_unlink, name='producto_unlink'),
     path('categorias/nueva/', views.categoria_create, name='categoria_create'),
     path('productos/anadir-stock/', views.anadir_stock, name='anadir_stock'),
+    path('productos/vendidos/', views.productos_vendidos, name='productos_vendidos'),
 ]

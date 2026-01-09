@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load format_numbers %}
+{% block titulo %}Productos - Más / Menos vendidos{% endblock %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold text-primary"><i class="bi bi-bar-chart-line-fill icon-circle icon-circle-lg"></i> Productos (vendidos)</h2>
+  <div>
+    <a href="{% url 'producto_list' %}" class="btn btn-outline-secondary rounded-pill">Volver</a>
+  </div>
+</div>
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Código de Barra</th>
+            <th>Nombre</th>
+            <th>Categoría</th>
+            <th>Tipo</th>
+            <th class="text-center">Unidades Vendidas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for producto in productos %}
+            <tr>
+              <td>{{ producto.codigo_barra }}</td>
+              <td class="fw-semibold">{{ producto.nombre }}</td>
+              <td>{{ producto.categoria }}</td>
+              <td>{{ producto.get_tipo_producto_display }}</td>
+              <td class="text-center">{{ producto.total_vendido|default:0|format_decimal:0 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="text-center text-muted">No hay productos.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
