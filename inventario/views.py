@@ -103,13 +103,6 @@ def categoria_create(request):
         if form.is_valid():
             categoria = form.save()
             messages.success(request, 'Categoría creada correctamente.')
-            # Registrar actividad de creación de categoría
-            Actividad.objects.create(
-                usuario=request.user,
-                tipo_accion='CREACION_CATEGORIA',
-                descripcion=f'Categoría creada: {categoria.nombre}',
-                caja=(Caja.objects.filter(abierta=True).order_by('-hora_apertura').first())
-            )
             return redirect('producto_list')
     else:
         form = CategoriaForm()
@@ -144,6 +137,51 @@ def categoria_create(request):
         })
 
     return render(request, 'inventario/categoria_form.html', {'form': form})
+
+
+@login_required
+def categoria_list(request):
+    categorias = Categoria.objects.all().order_by('nombre')
+    # incluir conteo de productos por categoría en la plantilla
+    return render(request, 'inventario/categoria_list.html', {
+        'categorias': categorias,
+    })
+
+
+@login_required
+def categoria_update(request, pk):
+    categoria = get_object_or_404(Categoria, pk=pk)
+    if request.method == 'POST':
+        form = CategoriaForm(request.POST, instance=categoria)
+        if form.is_valid():
+            categoria = form.save()
+            messages.success(request, 'Categoría actualizada correctamente.')
+            return redirect('categoria_list')
+    else:
+        form = CategoriaForm(instance=categoria)
+    return render(request, 'inventario/categoria_form.html', {'form': form})
+
+
+@login_required
+def categoria_delete(request, pk):
+    categoria = get_object_or_404(Categoria, pk=pk)
+    if request.method == 'POST':
+        try:
+            nombre = categoria.nombre
+            categoria.delete()
+            messages.success(request, 'Categoría eliminada correctamente.')
+            return redirect('categoria_list')
+        except ProtectedError:
+            messages.error(request, 'No se puede eliminar la categoría porque tiene productos asociados.')
+            return redirect('categoria_list')
+    # Si la categoría tiene productos asociados, marcar como protegida y pasar los relacionados
+    protected = categoria.productos.exists()
+    related_products = categoria.productos.all() if protected else None
+    return render(request, 'inventario/categoria_confirm_delete.html', {
+        'categoria': categoria,
+        'protected': protected,
+        'related_products': related_products,
+    })
 
 @login_required
 def productos_vendidos(request):
@@ -221,15 +259,19 @@ def producto_create(request):
         producto_form = ProductoForm(request.POST)
 
         if producto_form.is_valid():
-            producto = producto_form.save()
-            # Registrar actividad de creación de producto
-            Actividad.objects.create(
-                usuario=request.user,
-                tipo_accion='CREACION_PRODUCTO',
-                descripcion=f'Producto creado: {producto.nombre}',
-                caja=(Caja.objects.filter(abierta=True).order_by('-hora_apertura').first())
-            )
-            return redirect('producto_list')
+            try:
+                producto = producto_form.save()
+                return redirect('producto_list')
+            except Exception as e:
+                # Mostrar error al usuario con detalles mínimos para depuración
+                messages.error(request, f'Error al guardar el producto: {str(e)}')
+        else:
+            # Mostrar errores de validación en un mensaje para facilitar depuración en UI
+            try:
+                errores = producto_form.errors.as_text()
+            except Exception:
+                errores = str(producto_form.errors)
+            messages.error(request, 'No se pudo guardar el producto. Errores: ' + errores)
     else:
         producto_form = ProductoForm()
 
@@ -255,26 +297,37 @@ def producto_create(request):
         # Show decimals for stock fields
         for fname in ('stock_minimo', 'stock_actual_base'):
             if fname in producto_form.fields:
-                producto_form.fields[fname].widget.attrs.update({'step': '0.001'})
+                producto_form.fields[fname].widget.attrs.update({'step': '0.01'})
                 if not producto_form.is_bound:
                     val = getattr(producto_form.instance, fname, None)
                     if val is not None:
                         try:
-                            producto_form.initial[fname] = f"{float(val):.3f}"
+                            producto_form.initial[fname] = f"{float(val):.2f}"
                         except Exception:
                             producto_form.initial[fname] = val
 
     # Ensure precio_compra and precio_venta display as integers
+    # Ensure precio_compra and precio_venta display with correct step/format
     for pname in ('precio_compra', 'precio_venta'):
         if pname in producto_form.fields:
-            producto_form.fields[pname].widget.attrs.update({'step': '1'})
-            if not producto_form.is_bound:
-                val = getattr(producto_form.instance, pname, None)
-                if val is not None:
-                    try:
-                        producto_form.initial[pname] = int(val)
-                    except Exception:
-                        producto_form.initial[pname] = val
+            if tipo == 'GRANEL':
+                producto_form.fields[pname].widget.attrs.update({'step': '0.01'})
+                if not producto_form.is_bound:
+                    val = getattr(producto_form.instance, pname, None)
+                    if val is not None:
+                        try:
+                            producto_form.initial[pname] = f"{float(val):.2f}"
+                        except Exception:
+                            producto_form.initial[pname] = val
+            else:
+                producto_form.fields[pname].widget.attrs.update({'step': '1'})
+                if not producto_form.is_bound:
+                    val = getattr(producto_form.instance, pname, None)
+                    if val is not None:
+                        try:
+                            producto_form.initial[pname] = int(val)
+                        except Exception:
+                            producto_form.initial[pname] = val
 
     return render(request, 'inventario/producto_form.html', {
         'form': producto_form,
@@ -288,18 +341,20 @@ def producto_update(request, pk):
     if request.method == 'POST':
         form = ProductoForm(request.POST, instance=producto)
         if form.is_valid():
-            producto = form.save(commit=False)
-            if producto.tipo_producto in ['PACK', 'UNITARIO']:
-                producto.stock_minimo = int(producto.stock_minimo)
-            producto.save()
-            # Registrar actividad de edición de producto
-            Actividad.objects.create(
-                usuario=request.user,
-                tipo_accion='EDICION_PRODUCTO',
-                descripcion=f'Producto editado: {producto.nombre}',
-                caja=(Caja.objects.filter(abierta=True).order_by('-hora_apertura').first())
-            )
-            return redirect('producto_list')
+            try:
+                producto = form.save(commit=False)
+                if producto.tipo_producto in ['PACK', 'UNITARIO']:
+                    producto.stock_minimo = int(producto.stock_minimo)
+                producto.save()
+                return redirect('producto_list')
+            except Exception as e:
+                messages.error(request, f'Error al actualizar el producto: {str(e)}')
+        else:
+            try:
+                errores = form.errors.as_text()
+            except Exception:
+                errores = str(form.errors)
+            messages.error(request, 'No se pudo actualizar el producto. Errores: ' + errores)
     else:
         form = ProductoForm(instance=producto)
     # Ensure stock fields use integer step and show integer values when product is not GRANEL.
@@ -325,26 +380,37 @@ def producto_update(request, pk):
         # Show decimals for stock fields when GRANEL
         for fname in ('stock_minimo', 'stock_actual_base'):
             if fname in form.fields:
-                form.fields[fname].widget.attrs.update({'step': '0.001'})
+                form.fields[fname].widget.attrs.update({'step': '0.01'})
                 if not form.is_bound:
                     val = getattr(form.instance, fname, None)
                     if val is not None:
                         try:
-                            form.initial[fname] = f"{float(val):.3f}"
+                            form.initial[fname] = f"{float(val):.2f}"
                         except Exception:
                             form.initial[fname] = val
 
     # Ensure precio_compra and precio_venta display as integers
+    # Ensure precio_compra and precio_venta display with correct step/format
     for pname in ('precio_compra', 'precio_venta'):
         if pname in form.fields:
-            form.fields[pname].widget.attrs.update({'step': '1'})
-            if not form.is_bound:
-                val = getattr(form.instance, pname, None)
-                if val is not None:
-                    try:
-                        form.initial[pname] = int(val)
-                    except Exception:
-                        form.initial[pname] = val
+            if tipo == 'GRANEL':
+                form.fields[pname].widget.attrs.update({'step': '0.01'})
+                if not form.is_bound:
+                    val = getattr(form.instance, pname, None)
+                    if val is not None:
+                        try:
+                            form.initial[pname] = f"{float(val):.2f}"
+                        except Exception:
+                            form.initial[pname] = val
+            else:
+                form.fields[pname].widget.attrs.update({'step': '1'})
+                if not form.is_bound:
+                    val = getattr(form.instance, pname, None)
+                    if val is not None:
+                        try:
+                            form.initial[pname] = int(val)
+                        except Exception:
+                            form.initial[pname] = val
 
     return render(request, 'inventario/producto_form.html', {'form': form, 'accion': 'Editar'})
 

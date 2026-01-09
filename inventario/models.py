@@ -61,7 +61,10 @@ class Producto(models.Model):
     @property
     def stock_display(self):
         if self.tipo_producto == 'GRANEL':
-            return f"{self.stock_actual_base} kg"
+            try:
+                return f"{float(self.stock_actual_base):.2f} kg"
+            except Exception:
+                return f"{self.stock_actual_base} kg"
         # Si el producto es PACK pero se vende por unidad, mostrar el stock en unidades
         if self.tipo_producto == 'PACK' and self.unidad_base == 'UNIDAD' and self.unidades_por_pack:
             return int(self.stock_actual_base) * int(self.unidades_por_pack)
@@ -70,8 +73,14 @@ class Producto(models.Model):
     @property
     def stock_minimo_display(self):
         if self.tipo_producto == 'GRANEL':
-            return f"{self.stock_minimo or 0} kg"
-        return str(int(self.stock_minimo or 0))
+            try:
+                return f"{float(self.stock_minimo or 0):.2f} kg"
+            except Exception:
+                return f"{self.stock_minimo or 0} kg"
+        try:
+            return str(int(self.stock_minimo or 0))
+        except Exception:
+            return str(self.stock_minimo or 0)
 
     @property
     def margen_display(self):

@@ -31,12 +31,12 @@ class ProductoForm(forms.ModelForm):
             'categoria': forms.Select(attrs={'class': 'form-select'}),
             'tipo_producto': forms.Select(attrs={'class': 'form-select'}),
             'unidad_base': forms.Select(attrs={'class': 'form-select'}),
-            'stock_actual_base': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
-            'stock_minimo': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'stock_actual_base': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'stock_minimo': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'precio_compra': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'precio_venta': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'unidades_por_pack': forms.NumberInput(attrs={'class': 'form-control', 'step': '1'}),
-            'kg_por_caja': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'kg_por_caja': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
@@ -53,8 +53,8 @@ class ProductoForm(forms.ModelForm):
         unidades_por_pack = cleaned.get('unidades_por_pack')
         kg_por_caja = cleaned.get('kg_por_caja')
 
-        if precio_compra is not None and precio_venta is not None and precio_venta < precio_compra:
-            self.add_error('precio_venta', 'El precio de venta no puede ser menor al precio de compra.')
+        # Permitimos que el precio de venta sea menor al de compra desde la UI;
+        # la validación previa que impedía esto se ha eliminado para no bloquear el guardado.
 
         if tipo == 'PACK' and not unidades_por_pack:
             self.add_error('unidades_por_pack', 'Este campo es requerido para productos tipo PACK.')

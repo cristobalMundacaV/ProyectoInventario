@@ -12,6 +12,11 @@ class Actividad(models.Model):
         ('CREACION_PRODUCTO', 'Creación de Producto'),
         ('EDICION_PRODUCTO', 'Edición de Producto'),
         ('CREACION_CATEGORIA', 'Creación de Categoría'),
+        ('EDICION_CATEGORIA', 'Edición de Categoría'),
+        ('ELIMINACION_CATEGORIA', 'Eliminación de Categoría'),
+        ('CREACION_REGISTRO', 'Creación de Registro'),
+        ('EDICION_REGISTRO', 'Edición de Registro'),
+        ('ELIMINACION_REGISTRO', 'Eliminación de Registro'),
     ]
 
     fecha_hora = models.DateTimeField(auto_now_add=True)

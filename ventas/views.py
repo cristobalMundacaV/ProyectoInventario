@@ -88,6 +88,15 @@ def venta_comprobante(request, pk):
     return render(request, 'ventas/venta_comprobante.html', {'venta': venta})
 
 
+def venta_exists(request, pk):
+    """Endpoint simple que devuelve JSON indicando si la venta existe (no lanza 404).
+
+    Devuelve 200 con {'exists': true/false} para que el cliente verifique sin navegar.
+    """
+    exists = Venta.objects.filter(pk=pk).exists()
+    return JsonResponse({'exists': exists})
+
+
 @transaction.atomic
 def venta_create(request):
     User = get_user_model()

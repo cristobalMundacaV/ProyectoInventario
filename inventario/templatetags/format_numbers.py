@@ -53,8 +53,12 @@ def format_money(value):
         except Exception:
             return str(value)
     rounded = d.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-    # Return plain integer string without thousands separators
-    return str(int(rounded))
+    # Format integer with thousands separator as dot (e.g. 1.234.567)
+    try:
+        grouped = f"{int(rounded):,}".replace(',', '.')
+        return grouped
+    except Exception:
+        return str(int(rounded))
 
 
 @register.filter

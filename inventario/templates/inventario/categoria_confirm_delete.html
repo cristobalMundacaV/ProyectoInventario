@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block titulo %}Eliminar Categoría{% endblock %}
+{% block contenido %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
+  <div class="card shadow-lg border border-3 border-danger rounded-4" style="max-width: 540px; width: 100%; background: #fff8f8;">
+    <div class="card-header bg-danger text-white text-center fw-bold rounded-top-4" style="font-size: 1.2rem;">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>Eliminar Categoría
+    </div>
+    <div class="card-body text-center">
+      {% if protected %}
+        <div class="alert alert-danger text-start" role="alert">
+          <h6 class="alert-heading">No se puede eliminar esta categoría</h6>
+          <p>Esta categoría está referenciada por productos y no puede eliminarse:</p>
+          <ul>
+            {% for p in related_products %}
+              <li><a href="{% url 'producto_update' p.id %}">{{ p.nombre }}</a> — {{ p.stock_actual_base }} {{ p.unidad_base }}</li>
+            {% empty %}
+              <li>No hay productos relacionados visibles.</li>
+            {% endfor %}
+          </ul>
+          <p class="mb-0"><strong>Opciones:</strong> eliminar o editar los productos que referencian esta categoría, o cambiarles la categoría antes de intentar eliminarla.</p>
+        </div>
+
+        <a href="{% url 'producto_list' %}?categoria={{ categoria.id }}" class="btn btn-warning me-2"><i class="bi bi-box-seam"></i> Ver productos en esta categoría</a>
+        <a href="{% url 'categoria_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Volver</a>
+      {% else %}
+        <h5 class="mb-3 text-danger">¿Estás seguro que deseas eliminar la categoría <strong>{{ categoria.nombre }}</strong>?</h5>
+        <p class="text-muted mb-3">Esta acción eliminará la categoría del sistema.</p>
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger me-2"><i class="bi bi-trash"></i> Eliminar</button>
+          <a href="{% url 'categoria_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Cancelar</a>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

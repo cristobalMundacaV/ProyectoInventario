@@ -1,15 +1,14 @@
 {% extends 'base.html' %}
 {% block titulo %}{{ accion }} Producto{% endblock %}
 {% block contenido %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-5 mx-auto">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-          <h2 class="fw-bold text-primary"><i class="bi bi-box icon-circle icon-circle-lg"></i> {{ accion }} Producto</h2>
-          <!-- acciones futuras -->
+<div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
+    <div class="card shadow-lg border border-3 border-primary rounded-4" style="max-width: 900px; width:100%; background: #ffffff;">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center" style="border-bottom:0;">
+            <h2 class="fw-bold text-primary mb-0"><i class="bi bi-box icon-circle icon-circle-lg"></i> {{ accion }} Producto</h2>
+            <!-- acciones futuras -->
         </div>
-        <div class="card shadow border-0">
-            <div class="card-body">
-                <form method="post" autocomplete="off" id="productoForm">
+        <div class="card-body">
+            <form method="post" autocomplete="off" id="productoForm">
                     {% csrf_token %}
                     <div class="row">
                         <div class="col-md-7">
@@ -118,9 +117,19 @@
                 document.addEventListener('DOMContentLoaded', function() {
                     function toggleFields() {
                         var tipo = document.getElementById('id_tipo_producto').value;
+                        // Asignar unidad_base automáticamente según el tipo para asegurar que
+                        // el valor se envíe al servidor incluso cuando el campo esté oculto.
+                        var unidadBaseField = document.getElementById('id_unidad_base');
+                        if (unidadBaseField) {
+                            if (tipo === 'GRANEL') {
+                                unidadBaseField.value = 'KG';
+                            } else if (tipo === 'UNITARIO') {
+                                unidadBaseField.value = 'UNIDAD';
+                            } // Para 'PACK' dejamos que el usuario elija la unidad cuando se muestre.
+                        }
                         document.getElementById('field-unidades_por_pack').style.display = (tipo === 'PACK') ? 'block' : 'none';
-                        // Hide "kg por caja" for GRANEL and UNITARIO; show otherwise
-                        document.getElementById('field-kg_por_caja').style.display = (tipo === 'GRANEL' || tipo === 'UNITARIO') ? 'none' : 'block';
+                        // Mostrar "kg por caja" cuando el producto sea GRANEL o CAJA
+                        document.getElementById('field-kg_por_caja').style.display = (tipo === 'GRANEL' || tipo === 'CAJA') ? 'block' : 'none';
                         document.getElementById('precio-unitario-pack-container').style.display = (tipo === 'PACK') ? 'block' : 'none';
                         document.getElementById('precio-kg-granel-container').style.display = (tipo === 'GRANEL') ? 'block' : 'none';
                         document.getElementById('margen-pack-container').style.display = (tipo === 'PACK') ? 'block' : 'none';
@@ -132,8 +141,8 @@
                         // Ajustar step de inputs de stock según tipo
                         var stockMin = document.getElementById('id_stock_minimo');
                         var stockActual = document.getElementById('id_stock_actual_base');
-                        if (stockMin) stockMin.step = (tipo === 'GRANEL') ? '0.001' : '1';
-                        if (stockActual) stockActual.step = (tipo === 'GRANEL') ? '0.001' : '1';
+                        if (stockMin) stockMin.step = (tipo === 'GRANEL') ? '0.01' : '1';
+                        if (stockActual) stockActual.step = (tipo === 'GRANEL') ? '0.01' : '1';
                         calcularValores();
                         calcularStockUnidades();
                         mostrarStockEstimado();
@@ -177,7 +186,7 @@
                     }
                     function mostrarStockEstimado() {
                         var unidadBase = document.getElementById('id_unidad_base')?.value;
-                        var stockBase = parseFloat(document.getElementById('id_stock_base')?.value.replace(',', '.')) || 0;
+                        var stockBase = parseFloat(document.getElementById('id_stock_actual_base')?.value.replace(',', '.')) || 0;
                         var unidadesPorPack = parseInt(document.getElementById('id_unidades_por_pack')?.value) || 0;
                         var stockEstimado = '';
                         if (unidadBase === 'UNIDAD' && stockBase > 0 && unidadesPorPack > 0) {
@@ -195,7 +204,7 @@
                     var kgPorCajaInput = document.getElementById('id_kg_por_caja');
                     var cantidadCajasInput = document.getElementById('id_cantidad_cajas');
                     var unidadBaseInput = document.getElementById('id_unidad_base');
-                    var stockBaseInput = document.getElementById('id_stock_base');
+                    var stockBaseInput = document.getElementById('id_stock_actual_base');
                     if (tipoSelect) {
                         tipoSelect.addEventListener('change', toggleFields);
                         toggleFields();
