@@ -17,6 +17,9 @@ from auditoria.models import Actividad
 from inventario.templatetags.format_numbers import format_money, format_decimal
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from decimal import Decimal
 
 
 def venta_list(request):
@@ -296,3 +299,55 @@ def venta_create(request):
         'caja_activa': caja_activa,
         'usuario_actual': usuario_actual,
     })
+
+
+@login_required
+@require_POST
+def agregar_producto_ajax(request):
+    """Endpoint AJAX para buscar un producto por `codigo` (o id) y devolver datos mínimos.
+    Espera JSON: {"codigo": "...", "cantidad": 1}
+    """
+    try:
+        payload = json.loads(request.body)
+    except Exception:
+        payload = request.POST
+
+    codigo = payload.get('codigo')
+    cantidad = payload.get('cantidad', 1)
+
+    if not codigo:
+        return JsonResponse({'ok': False, 'error': 'Código vacío'}, status=400)
+
+    # Buscar por código de barra o por id
+    producto = None
+    try:
+        producto = Producto.objects.get(codigo_barra=codigo)
+    except Exception:
+        try:
+            producto = Producto.objects.get(pk=int(codigo))
+        except Exception:
+            return JsonResponse({'ok': False, 'error': 'Producto no encontrado'}, status=404)
+
+    # Verificar stock si aplica
+    try:
+        q = Decimal(str(cantidad))
+    except Exception:
+        q = Decimal('1')
+
+    if producto.stock_actual_base is not None and q > producto.stock_actual_base:
+        return JsonResponse({'ok': False, 'error': 'Stock insuficiente', 'available': str(producto.stock_actual_base)}, status=400)
+
+    # Responder con datos para que el frontend agregue la línea
+    data = {
+        'ok': True,
+        'producto': {
+            'id': producto.id,
+            'codigo_barra': producto.codigo_barra,
+            'nombre': producto.nombre,
+            'precio_venta': float(producto.precio_venta),
+            'tipo_producto': producto.tipo_producto,
+            'unidad_base': producto.unidad_base,
+            'stock_actual_base': float(producto.stock_actual_base or 0),
+        }
+    }
+    return JsonResponse(data)
