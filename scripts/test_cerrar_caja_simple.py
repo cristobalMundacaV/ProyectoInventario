@@ -58,7 +58,7 @@ for v in ventas:
     total_vendido += D(str(v.total))
     if v.metodo_pago == 'EFECTIVO':
         total_efectivo += D(str(v.total))
-    elif v.metodo_pago == 'TARJETA':
+    elif v.metodo_pago in ('TARJETA', 'DEBITO'):
         total_debito += D(str(v.total))
     elif v.metodo_pago == 'TRANSFERENCIA':
         total_transferencia += D(str(v.total))

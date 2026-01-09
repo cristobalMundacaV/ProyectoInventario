@@ -2,17 +2,26 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.db.models.deletion import ProtectedError
 from django.contrib import messages
-from .models import Producto, Categoria
-from .forms import ProductoForm, AnadirStockForm
+from django.db import transaction
+from django.forms import inlineformset_factory
+
+from .models import Producto, Categoria, IngresoStock, IngresoStockDetalle
+from .forms import ProductoForm, AnadirStockForm, IngresoStockForm, IngresoStockDetalleForm
 from inventario.templatetags.format_numbers import format_decimal
 from auditoria.models import Actividad
 from caja.models import Caja
 from decimal import Decimal
 from django.db.models import F, Sum, Q
+from django.core.exceptions import ValidationError
+
+from core.authz import role_required, admin_required
+from core.roles import Role
+from core.roles import is_admin
 
 
 # --- Vista para añadir stock ---
 @login_required
+@role_required(Role.ENCARGADO)
 def anadir_stock(request):
     if request.method == 'POST':
         form = AnadirStockForm(request.POST)
@@ -95,8 +104,18 @@ class CategoriaForm(forms.ModelForm):
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
 
+    def clean_nombre(self):
+        nombre = (self.cleaned_data.get('nombre') or '').strip()
+        qs = Categoria.objects.filter(nombre__iexact=nombre)
+        if self.instance and getattr(self.instance, 'pk', None):
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError('Ya existe una categoría con ese nombre.')
+        return nombre
+
 
 @login_required
+@role_required(Role.ENCARGADO)
 def categoria_create(request):
     if request.method == 'POST':
         form = CategoriaForm(request.POST)
@@ -140,6 +159,7 @@ def categoria_create(request):
 
 
 @login_required
+@role_required(Role.ENCARGADO)
 def categoria_list(request):
     categorias = Categoria.objects.all().order_by('nombre')
     # incluir conteo de productos por categoría en la plantilla
@@ -149,6 +169,7 @@ def categoria_list(request):
 
 
 @login_required
+@role_required(Role.ENCARGADO)
 def categoria_update(request, pk):
     categoria = get_object_or_404(Categoria, pk=pk)
     if request.method == 'POST':
@@ -163,6 +184,7 @@ def categoria_update(request, pk):
 
 
 @login_required
+@admin_required
 def categoria_delete(request, pk):
     categoria = get_object_or_404(Categoria, pk=pk)
     if request.method == 'POST':
@@ -184,6 +206,7 @@ def categoria_delete(request, pk):
     })
 
 @login_required
+@role_required(Role.ENCARGADO)
 def productos_vendidos(request):
     """Lista de productos ordenada por unidades vendidas (mayor a menor).
     Opcional: filtrar por rango de fechas con GET `start` y `end` (YYYY-MM-DD).
@@ -210,6 +233,7 @@ def productos_vendidos(request):
 
 
 @login_required
+@role_required(Role.ENCARGADO)
 def producto_list(request):
     nombre = request.GET.get('nombre', '')
     categoria = request.GET.get('categoria', '')
@@ -253,10 +277,135 @@ def producto_list(request):
         'anadir_stock_form': anadir_stock_form,
     })
 
+
 @login_required
+@role_required(Role.ENCARGADO)
+def ingreso_stock_list(request):
+    ingresos = IngresoStock.objects.select_related('usuario').prefetch_related('detalles').order_by('-fecha')
+    return render(request, 'inventario/ingreso_stock_list.html', {
+        'ingresos': ingresos,
+    })
+
+
+@login_required
+@role_required(Role.ENCARGADO)
+def ingreso_stock_detail(request, pk):
+    ingreso = get_object_or_404(
+        IngresoStock.objects.select_related('usuario').prefetch_related('detalles__producto'),
+        pk=pk,
+    )
+    return render(request, 'inventario/ingreso_stock_detail.html', {
+        'ingreso': ingreso,
+    })
+
+
+@login_required
+@role_required(Role.ENCARGADO)
+def ingreso_stock_create(request):
+    DetalleFormSet = inlineformset_factory(
+        IngresoStock,
+        IngresoStockDetalle,
+        form=IngresoStockDetalleForm,
+        extra=5,
+        can_delete=True,
+    )
+
+    if request.method == 'POST':
+        form = IngresoStockForm(request.POST)
+        formset = DetalleFormSet(request.POST)
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                ingreso = form.save(commit=False)
+                ingreso.usuario = request.user
+                ingreso.save()
+
+                formset.instance = ingreso
+                detalles = formset.save(commit=False)
+
+                # Build a human-friendly summary for the audit entry.
+                # We aggregate quantities per product so the activity reads like:
+                # "Ingreso de stock (FACTURA 123) items: Coca Cola +2 unid, Harina +1 kg"
+                items_por_producto = {}
+                for det in detalles:
+                    if det.producto_id is None or det.cantidad_base is None:
+                        continue
+                    if det.cantidad_base <= 0:
+                        continue
+
+                    Producto.objects.filter(pk=det.producto_id).update(
+                        stock_actual_base=F('stock_actual_base') + det.cantidad_base
+                    )
+                    det.ingreso = ingreso
+                    det.save()
+                    try:
+                        prod = det.producto
+                        key = (prod.pk, prod.nombre, prod.tipo_producto)
+                        items_por_producto[key] = (items_por_producto.get(key) or Decimal('0')) + det.cantidad_base
+                    except Exception:
+                        # Best-effort: if anything goes wrong building the summary, still record the ingreso.
+                        pass
+
+                for obj in formset.deleted_objects:
+                    obj.delete()
+
+                caja_abierta = Caja.objects.filter(abierta=True).order_by('-hora_apertura').first()
+                doc = ingreso.tipo_documento
+                if ingreso.numero_documento:
+                    doc = f"{doc} {ingreso.numero_documento}"
+
+                partes_items = []
+                try:
+                    for (_, nombre, tipo_prod), cantidad_total in items_por_producto.items():
+                        if tipo_prod == 'GRANEL':
+                            unidad = 'kg'
+                        else:
+                            unidad = 'unidad' if cantidad_total == Decimal('1') else 'unidades'
+                        partes_items.append(f"{nombre} +{format_decimal(cantidad_total)} {unidad}")
+                except Exception:
+                    partes_items = []
+
+                if partes_items:
+                    items_txt = ", ".join(partes_items)
+                    descripcion = f"Ingreso de stock ({doc}) items: {items_txt}"
+                else:
+                    # Fallback if we couldn't build a per-item summary.
+                    descripcion = f"Ingreso de stock ({doc})"
+
+                Actividad.objects.create(
+                    usuario=request.user,
+                    tipo_accion='INGRESO_STOCK',
+                    descripcion=descripcion,
+                    caja=caja_abierta,
+                )
+
+            messages.success(request, 'Ingreso de stock registrado correctamente.')
+            return redirect('ingreso_stock_detail', pk=ingreso.pk)
+        messages.error(request, 'No se pudo registrar el ingreso. Revise los datos.')
+    else:
+        form = IngresoStockForm()
+        formset = DetalleFormSet()
+
+    return render(request, 'inventario/ingreso_stock_form.html', {
+        'form': form,
+        'formset': formset,
+    })
+
+
+@login_required
+@role_required(Role.ENCARGADO)
+def productos_bajo_stock(request):
+    productos = Producto.objects.filter(stock_minimo__gt=0).filter(stock_actual_base__lte=F('stock_minimo')).order_by('nombre')
+    for p in productos:
+        p.bajo_stock = True
+    return render(request, 'inventario/productos_bajo_stock.html', {
+        'productos': productos,
+    })
+
+@login_required
+@admin_required
 def producto_create(request):
     if request.method == 'POST':
-        producto_form = ProductoForm(request.POST)
+        producto_form = ProductoForm(request.POST, user=request.user)
 
         if producto_form.is_valid():
             try:
@@ -273,7 +422,7 @@ def producto_create(request):
                 errores = str(producto_form.errors)
             messages.error(request, 'No se pudo guardar el producto. Errores: ' + errores)
     else:
-        producto_form = ProductoForm()
+        producto_form = ProductoForm(user=request.user)
 
     # Ensure stock fields use integer step and integer initial values when tipo != GRANEL
     tipo = None
@@ -331,17 +480,34 @@ def producto_create(request):
 
     return render(request, 'inventario/producto_form.html', {
         'form': producto_form,
-        'accion': 'Nuevo'
+        'accion': 'Nuevo',
+        'can_edit_prices': True,
     })
 
 
 @login_required
+@role_required(Role.ENCARGADO)
 def producto_update(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
+    can_edit_prices = is_admin(request.user)
     if request.method == 'POST':
-        form = ProductoForm(request.POST, instance=producto)
+        old_precio_compra = getattr(producto, 'precio_compra', None)
+        old_precio_venta = getattr(producto, 'precio_venta', None)
+        form = ProductoForm(request.POST, instance=producto, user=request.user)
         if form.is_valid():
             try:
+                # Regla: solo Administrador puede cambiar precios
+                if not can_edit_prices and ('precio_compra' in form.cleaned_data or 'precio_venta' in form.cleaned_data):
+                    new_precio_compra = form.cleaned_data.get('precio_compra')
+                    new_precio_venta = form.cleaned_data.get('precio_venta')
+                    if (new_precio_compra != old_precio_compra) or (new_precio_venta != old_precio_venta):
+                        messages.error(request, 'No tiene permisos para cambiar precios. (Solo Administrador)')
+                        return render(request, 'inventario/producto_form.html', {
+                            'form': form,
+                            'accion': 'Editar',
+                            'can_edit_prices': can_edit_prices,
+                        })
+
                 producto = form.save(commit=False)
                 if producto.tipo_producto in ['PACK', 'UNITARIO']:
                     producto.stock_minimo = int(producto.stock_minimo)
@@ -356,7 +522,7 @@ def producto_update(request, pk):
                 errores = str(form.errors)
             messages.error(request, 'No se pudo actualizar el producto. Errores: ' + errores)
     else:
-        form = ProductoForm(instance=producto)
+        form = ProductoForm(instance=producto, user=request.user)
     # Ensure stock fields use integer step and show integer values when product is not GRANEL.
     tipo = None
     if form.instance and getattr(form.instance, 'tipo_producto', None):
@@ -412,9 +578,14 @@ def producto_update(request, pk):
                         except Exception:
                             form.initial[pname] = val
 
-    return render(request, 'inventario/producto_form.html', {'form': form, 'accion': 'Editar'})
+    return render(request, 'inventario/producto_form.html', {
+        'form': form,
+        'accion': 'Editar',
+        'can_edit_prices': can_edit_prices,
+    })
 
 @login_required
+@admin_required
 def producto_delete(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
     if request.method == 'POST':
@@ -433,6 +604,7 @@ def producto_delete(request, pk):
 
 
 @login_required
+@role_required(Role.ENCARGADO)
 def producto_deactivate(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
     if request.method == 'POST':
@@ -450,6 +622,7 @@ def producto_deactivate(request, pk):
 
 
 @login_required
+@admin_required
 def producto_unlink(request, pk):
     """Unlink product from all VentaDetalle (set producto=NULL) but keep the product in the database."""
     producto = get_object_or_404(Producto, pk=pk)

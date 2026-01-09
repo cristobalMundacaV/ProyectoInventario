@@ -6,9 +6,13 @@ from django.db.models import Sum
 from django.utils import timezone
 from django import forms
 from django.shortcuts import redirect
+from django.db.models import Q
+
+from core.authz import admin_required
 
 
 @login_required
+@admin_required
 def auditoria_list(request):
     """List activities. If ?ventas_mes=1 is provided, show ventas of current month and total."""
     show_ventas_mes = request.GET.get('ventas_mes') in ('1', 'true', 'yes')
@@ -26,7 +30,18 @@ def auditoria_list(request):
             'ventas_total': total_mes,
         })
     # default: show recent actividades
-    actividades = Actividad.objects.all().order_by('-fecha_hora')[:100]
+    # Hide legacy noisy generic "CREACION_REGISTRO" rows for IngresoStock and its details.
+    # (New entries are already suppressed at the signal level.)
+    actividades = (
+        Actividad.objects.exclude(
+            Q(tipo_accion='CREACION_REGISTRO')
+            & (
+                Q(descripcion__startswith='Creado IngresoStockDetalle')
+                | Q(descripcion__startswith='Creado IngresoStock')
+            )
+        )
+        .order_by('-fecha_hora')[:100]
+    )
     context['actividades'] = actividades
     return render(request, 'auditoria/auditoria_list.html', context)
 
@@ -38,6 +53,7 @@ class FechaRangeForm(forms.Form):
 
 
 @login_required
+@admin_required
 def ventas_por_fecha(request):
     """View that shows ventas filtered by date range and total sold in that range."""
     # If user submitted POST or provided GET fecha_desde/fecha_hasta, use them

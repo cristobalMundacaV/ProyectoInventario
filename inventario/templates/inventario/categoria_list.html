@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load roles %}
 {% block titulo %}Categorías{% endblock %}
 {% block contenido %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -28,7 +29,9 @@
             <td class="text-center">{{ cat.productos.count }}</td>
             <td class="text-center">
               <a href="{% url 'categoria_update' cat.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
+              {% if request.user|user_is_admin %}
               <a href="{% url 'categoria_delete' cat.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="bi bi-trash"></i></a>
+              {% endif %}
             </td>
           </tr>
           {% empty %}

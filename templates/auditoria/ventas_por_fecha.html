@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load roles %}
 {% load tz %}
 {% load format_numbers %}
 
@@ -9,7 +10,9 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="fw-bold text-primary"><i class="bi bi-receipt icon-circle icon-circle-lg"></i> Ventas por Fecha</h2>
         <div class="d-flex gap-2 justify-content-end">
+            {% if user|user_is_admin %}
             <a href="{% url 'auditoria_list' %}" class="btn btn-primary rounded-pill px-3"><i class="bi bi-receipt me-1"></i> Ver todo</a>
+            {% endif %}
         </div>
     </div>
     <div class="card">

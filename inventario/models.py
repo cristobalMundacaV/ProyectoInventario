@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class Categoria(models.Model):
@@ -144,7 +145,17 @@ class Producto(models.Model):
 
 
 class IngresoStock(models.Model):
-    fecha = models.DateTimeField(auto_now_add=True)
+    TIPO_DOCUMENTO_CHOICES = [
+        ('FACTURA', 'Factura'),
+        ('REMITO', 'Remito'),
+        ('RECEPCION', 'Recepción'),
+        ('OTRO', 'Otro'),
+    ]
+
+    fecha = models.DateTimeField(default=timezone.now)
+    tipo_documento = models.CharField(max_length=20, choices=TIPO_DOCUMENTO_CHOICES, default='OTRO')
+    numero_documento = models.CharField(max_length=50, blank=True, null=True)
+    proveedor = models.CharField(max_length=100, blank=True, null=True)
     usuario = models.ForeignKey(
         'auth.User',
         on_delete=models.PROTECT
@@ -152,7 +163,10 @@ class IngresoStock(models.Model):
     observacion = models.CharField(max_length=200, blank=True, null=True)
 
     def __str__(self):
-        return f"Ingreso {self.id} - {self.fecha.date()}"
+        doc = self.tipo_documento
+        if self.numero_documento:
+            doc = f"{doc} {self.numero_documento}"
+        return f"Ingreso {self.id} - {self.fecha.date()} - {doc}"
 
 
 class IngresoStockDetalle(models.Model):

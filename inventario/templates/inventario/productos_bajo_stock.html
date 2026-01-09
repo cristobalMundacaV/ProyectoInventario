@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% load format_numbers %}
+{% block titulo %}Productos Bajo Stock{% endblock %}
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-danger"><i class="bi bi-exclamation-triangle icon-circle icon-circle-lg"></i> Bajo stock</h2>
+    <div class="d-flex gap-2">
+      <a href="{% url 'producto_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-box me-2"></i> Volver a productos</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Producto</th>
+            <th>Categoría</th>
+            <th>Tipo</th>
+            <th class="text-end">Stock</th>
+            <th class="text-end">Mínimo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for producto in productos %}
+            <tr class="table-danger">
+              <td>{{ producto.codigo_barra }}</td>
+              <td class="fw-semibold">{{ producto.nombre }}</td>
+              <td>{{ producto.categoria }}</td>
+              <td>{{ producto.get_tipo_producto_display }}</td>
+              <td class="text-end">{{ producto.stock_display }}</td>
+              <td class="text-end">{{ producto.stock_minimo_display }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No hay productos con bajo stock.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

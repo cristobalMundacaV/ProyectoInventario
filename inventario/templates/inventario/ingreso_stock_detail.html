@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block titulo %}Ingreso #{{ ingreso.id }}{% endblock %}
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-receipt icon-circle icon-circle-lg"></i> Ingreso #{{ ingreso.id }}</h2>
+    <div class="d-flex gap-2">
+      <a href="{% url 'ingreso_stock_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
+      <a href="{% url 'ingreso_stock_create' %}" class="btn btn-success rounded-pill shadow btn-new-product"><i class="bi bi-plus-circle me-2"></i> Nuevo</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <p class="mb-2"><strong>Fecha:</strong> {{ ingreso.fecha|date:"Y-m-d H:i" }}</p>
+          <p class="mb-2"><strong>Documento:</strong> {{ ingreso.get_tipo_documento_display }}{% if ingreso.numero_documento %} {{ ingreso.numero_documento }}{% endif %}</p>
+          <p class="mb-2"><strong>Proveedor:</strong> {{ ingreso.proveedor|default:"-" }}</p>
+          <p class="mb-2"><strong>Usuario:</strong> {{ ingreso.usuario.username }}</p>
+          <p class="mb-0"><strong>Observación:</strong> {{ ingreso.observacion|default:"-" }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <strong>Detalle</strong>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-striped mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Producto</th>
+                <th class="text-end">Cantidad (stock base)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for det in ingreso.detalles.all %}
+                <tr>
+                  <td>{% if det.producto %}{{ det.producto.nombre }}{% else %}<span class="text-muted">(sin producto)</span>{% endif %}</td>
+                  <td class="text-end">{{ det.cantidad_base|floatformat:"-3" }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-center text-muted py-3">Sin items.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

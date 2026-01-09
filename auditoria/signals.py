@@ -43,9 +43,14 @@ def _should_audit(sender):
     # Avoid auditing internal Django models and the Actividad model itself
     app_label = sender._meta.app_label
     model_name = sender.__name__
-    if app_label in ('admin', 'contenttypes', 'sessions', 'auth'):
+    # NOTE: 'migrations' corresponds to django_migrations.Migration; auditing it can break migrate/test DB setup
+    if app_label in ('admin', 'contenttypes', 'sessions', 'auth', 'migrations'):
         return False
     if model_name == 'Actividad':
+        return False
+    # IngresoStock already has a dedicated, human-friendly INGRESO_STOCK audit entry.
+    # Auditing the header + each detail as generic "CREACION_REGISTRO" is noisy in UI.
+    if app_label == 'inventario' and model_name.lower() in ('ingresostock', 'ingresostockdetalle'):
         return False
     return True
 
@@ -123,6 +128,13 @@ def _audit_changes(sender, instance, created, **kwargs):
                 try:
                     nombre = getattr(instance, 'nombre', None)
                     descr = f'Categoría creada: {nombre}' if nombre else f'Creado {model_label} id={getattr(instance, "pk", None)}'
+                except Exception:
+                    descr = f'Creado {model_label} id={getattr(instance, "pk", None)}'
+            elif getattr(sender._meta, 'app_label', '') == 'inventario' and sender.__name__.lower() == 'producto':
+                tipo = 'CREACION_PRODUCTO'
+                try:
+                    nombre = getattr(instance, 'nombre', None)
+                    descr = f'Producto creado: {nombre}' if nombre else f'Creado {model_label} id={getattr(instance, "pk", None)}'
                 except Exception:
                     descr = f'Creado {model_label} id={getattr(instance, "pk", None)}'
             else:

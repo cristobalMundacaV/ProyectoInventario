@@ -10,6 +10,8 @@
         <div class="d-flex align-items-center gap-2">
             <button type="button" id="btnFilter" class="btn btn-outline-primary btn-new-product"><i class="bi bi-funnel-fill me-1"></i> Filtrar</button>
             <a href="{% url 'venta_list' %}" class="btn rounded-pill shadow btn-new-product btn-outline-secondary" title="Quitar filtros"><i class="bi bi-x-circle me-1"></i> Limpiar filtros</a>
+            <a href="{% url 'ventas_reporte_por_dia' %}" class="btn btn-outline-primary rounded-pill shadow btn-new-product" title="Reporte por día"><i class="bi bi-calendar3 me-1"></i> Por día</a>
+            <a href="{% url 'ventas_reporte_por_metodo' %}" class="btn btn-outline-primary rounded-pill shadow btn-new-product" title="Reporte por método"><i class="bi bi-credit-card me-1"></i> Por método</a>
             <a href="{% url 'venta_create' %}" class="btn btn-success shadow btn-new-product"><i class="bi bi-plus-circle"></i> Nueva Venta</a>
         </div>
 </div>

@@ -1,5 +1,7 @@
 from django import forms
 from .models import Producto
+from .models import IngresoStock, IngresoStockDetalle
+from core.roles import is_admin
 
 # Formulario para añadir stock
 class AnadirStockForm(forms.Form):
@@ -41,9 +43,16 @@ class ProductoForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         # Allow unidad_base to be omitted from POST when the client disables it (we set a sensible default in clean())
         self.fields['unidad_base'].required = False
+
+        # Solo Administrador puede cambiar precios: ocultamos los campos del form
+        # para Encargado, evitando que se rendericen o se validen.
+        if user is not None and not is_admin(user):
+            self.fields.pop('precio_compra', None)
+            self.fields.pop('precio_venta', None)
 
     def clean(self):
         cleaned = super().clean()
@@ -78,3 +87,26 @@ class ProductoForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class IngresoStockForm(forms.ModelForm):
+    class Meta:
+        model = IngresoStock
+        fields = ['fecha', 'tipo_documento', 'numero_documento', 'proveedor', 'observacion']
+        widgets = {
+            'fecha': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'tipo_documento': forms.Select(attrs={'class': 'form-select'}),
+            'numero_documento': forms.TextInput(attrs={'class': 'form-control'}),
+            'proveedor': forms.TextInput(attrs={'class': 'form-control'}),
+            'observacion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+
+class IngresoStockDetalleForm(forms.ModelForm):
+    class Meta:
+        model = IngresoStockDetalle
+        fields = ['producto', 'cantidad_base']
+        widgets = {
+            'producto': forms.Select(attrs={'class': 'form-select'}),
+            'cantidad_base': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001', 'min': '0.001'}),
+        }

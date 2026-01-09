@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load tz %}
 {% load format_numbers %}
+{% load roles %}
 
 {% block title %}Panel Principal{% endblock %}
 
@@ -139,10 +140,12 @@
                                     <i class="bi bi-box-seam"></i>
                                     Productos
                                 </a>
+                                {% if request.user|user_is_admin %}
                                 <a href="{% url 'producto_create' %}" class="btn btn-success shadow btn-new-product">
                                     <i class="bi bi-plus"></i>
                                     Nuevo Producto
                                 </a>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -187,9 +190,11 @@
                         <i class="bi bi-clock-history"></i>
                         Últimas Actividades
                     </h6>
+                    {% if user|user_is_admin %}
                     <a href="{% url 'auditoria_list' %}" class="btn btn-outline-light shadow btn-new-product">
                         <i class="bi bi-arrow-right"></i> Ver todas
                     </a>
+                    {% endif %}
                 </div>
                 <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
                     {% if ultimas_actividades %}
@@ -202,7 +207,7 @@
                                         {% if actividad.tipo_accion == 'CREACION_CATEGORIA' or actividad.tipo_accion == 'EDICION_CATEGORIA' or actividad.tipo_accion == 'ELIMINACION_CATEGORIA' %}
                                         <p class="mb-1 small {% if actividad.tipo_accion == 'STOCK_BAJO' %}text-danger{% else %}text-muted{% endif %}">{{ actividad.descripcion|strip_decimals_in_text }}</p>
                                         {% else %}
-                                        <p class="mb-1 small {% if actividad.tipo_accion == 'STOCK_BAJO' %}text-danger{% else %}text-muted{% endif %}">{{ actividad.descripcion|strip_decimals_in_text|truncatechars:80 }}</p>
+                                        <p class="mb-1 small {% if actividad.tipo_accion == 'STOCK_BAJO' %}text-danger{% else %}text-muted{% endif %}" title="{{ actividad.descripcion|strip_decimals_in_text }}">{{ actividad.descripcion|strip_decimals_in_text|truncatewords:16 }}</p>
                                         {% endif %}
                                         {% if actividad.tipo_accion != 'STOCK_BAJO' %}
                                         <small class="text-muted">

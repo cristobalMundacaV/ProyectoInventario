@@ -8,8 +8,13 @@ from .models import Caja
 from .forms import AperturaCajaForm
 from auditoria.models import Actividad
 from inventario.templatetags.format_numbers import format_money
+from django.db.models import Sum, Count
+
+from core.authz import role_required
+from core.roles import Role
 
 @login_required
+@role_required(Role.ENCARGADO)
 def caja_list(request):
     fecha_desde = request.GET.get('fecha_desde', '')
     fecha_hasta = request.GET.get('fecha_hasta', '')
@@ -49,6 +54,47 @@ def caja_list(request):
 
 
 @login_required
+@role_required(Role.ENCARGADO)
+def reporte_ganancia_diaria(request):
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+
+    qs = Caja.objects.all()
+    if fecha_desde:
+        try:
+            qs = qs.filter(fecha__gte=fecha_desde)
+        except Exception:
+            pass
+    if fecha_hasta:
+        try:
+            qs = qs.filter(fecha__lte=fecha_hasta)
+        except Exception:
+            pass
+
+    rows = (
+        qs.values('fecha')
+        .annotate(
+            cajas=Count('id'),
+            total_vendido=Sum('total_vendido'),
+            ganancia=Sum('ganancia_diaria'),
+        )
+        .order_by('-fecha')
+    )
+
+    totals = qs.aggregate(total_vendido=Sum('total_vendido'), ganancia=Sum('ganancia_diaria'))
+    total_vendido_general = totals.get('total_vendido') or Decimal('0.00')
+    ganancia_general = totals.get('ganancia') or Decimal('0.00')
+
+    return render(request, 'caja/reporte_ganancia_diaria.html', {
+        'rows': rows,
+        'filtros': {'fecha_desde': fecha_desde, 'fecha_hasta': fecha_hasta},
+        'total_vendido_general': total_vendido_general,
+        'ganancia_general': ganancia_general,
+    })
+
+
+@login_required
+@role_required(Role.ENCARGADO)
 def caja_detail(request, pk):
     """Muestra el detalle de una caja: ventas y sus detalles."""
     caja = get_object_or_404(Caja, pk=pk)
@@ -56,6 +102,7 @@ def caja_detail(request, pk):
     return render(request, 'caja/caja_detail.html', {'caja': caja, 'ventas': ventas})
 
 @login_required
+@role_required(Role.ENCARGADO)
 def abrir_caja(request):
     if request.method == 'POST':
         form = AperturaCajaForm(request.POST)
@@ -89,6 +136,7 @@ def abrir_caja(request):
     return render(request, 'caja/apertura_caja.html', {'form': form})
 
 @login_required
+@role_required(Role.ENCARGADO)
 def confirmar_cerrar_caja(request):
     """Muestra los datos de la caja para confirmación antes de cerrar."""
     cajas_abiertas = Caja.objects.filter(abierta=True).order_by('-hora_apertura')
@@ -114,7 +162,7 @@ def confirmar_cerrar_caja(request):
             if v.metodo_pago == 'EFECTIVO':
                 total_efectivo += Decimal(str(v.total))
             elif v.metodo_pago in ('TARJETA', 'DEBITO'):
-                # Aceptar tanto el valor actual 'TARJETA' como registros antiguos 'DEBITO'
+                # Aceptar tanto el valor actual 'TARJETA' como registros legacy 'DEBITO'
                 total_tarjeta += Decimal(str(v.total))
             elif v.metodo_pago == 'TRANSFERENCIA':
                 total_transferencia += Decimal(str(v.total))
@@ -139,6 +187,7 @@ def confirmar_cerrar_caja(request):
     return render(request, 'caja/confirmar_cierre.html', {'cajas_datos': cajas_datos, 'next': next_url})
 
 @login_required
+@role_required(Role.ENCARGADO)
 def cerrar_caja(request):
     if request.method == 'POST':
         cajas_abiertas = Caja.objects.filter(abierta=True)
@@ -169,7 +218,7 @@ def cerrar_caja(request):
                     if v.metodo_pago == 'EFECTIVO':
                         total_efectivo += Decimal(str(v.total))
                     elif v.metodo_pago in ('TARJETA', 'DEBITO'):
-                        # Aceptar tanto el valor actual 'TARJETA' como registros antiguos 'DEBITO'
+                        # Aceptar tanto el valor actual 'TARJETA' como registros legacy 'DEBITO'
                         total_tarjeta += Decimal(str(v.total))
                     elif v.metodo_pago == 'TRANSFERENCIA':
                         total_transferencia += Decimal(str(v.total))

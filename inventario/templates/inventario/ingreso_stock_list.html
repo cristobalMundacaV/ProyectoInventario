@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block titulo %}Ingresos de Stock{% endblock %}
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-truck icon-circle icon-circle-lg"></i> Ingresos de Stock</h2>
+    <div class="d-flex gap-2">
+      <a href="{% url 'ingreso_stock_create' %}" class="btn btn-success rounded-pill shadow btn-new-product"><i class="bi bi-plus-circle me-2"></i> Nuevo Ingreso</a>
+      <a href="{% url 'producto_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-box me-2"></i> Productos</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Documento</th>
+            <th>Proveedor</th>
+            <th>Usuario</th>
+            <th class="text-end">Items</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ingreso in ingresos %}
+            <tr>
+              <td>{{ ingreso.id }}</td>
+              <td>{{ ingreso.fecha|date:"Y-m-d H:i" }}</td>
+              <td>{{ ingreso.get_tipo_documento_display }}{% if ingreso.numero_documento %} {{ ingreso.numero_documento }}{% endif %}</td>
+              <td>{{ ingreso.proveedor|default:"-" }}</td>
+              <td>{{ ingreso.usuario.username }}</td>
+              <td class="text-end">{{ ingreso.detalles.count }}</td>
+              <td class="text-end">
+                <a href="{% url 'ingreso_stock_detail' ingreso.id %}" class="btn btn-outline-primary btn-sm rounded-pill"><i class="bi bi-eye me-1"></i> Ver</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No hay ingresos registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

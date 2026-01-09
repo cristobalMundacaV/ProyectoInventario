@@ -4,7 +4,8 @@
 {% block contenido %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold text-primary"><i class="bi bi-cash-stack icon-circle icon-circle-lg"></i> Cajas</h2>
-    <div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'reporte_ganancia_diaria' %}" class="btn btn-outline-primary shadow btn-new-product rounded-pill"><i class="bi bi-graph-up me-1"></i> Ganancia diaria</a>
         {% if not cajas_abiertas %}
         <a href="{% url 'abrir_caja' %}" class="btn btn-success shadow btn-new-product"><i class="bi bi-plus-circle"></i> Abrir Caja</a>
         {% else %}

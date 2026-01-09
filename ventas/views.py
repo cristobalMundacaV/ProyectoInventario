@@ -19,9 +19,15 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from decimal import Decimal
+from django.db.models import Sum, Count
+
+from core.authz import role_required
+from core.roles import Role
 
 
+
+@login_required
+@role_required(Role.ENCARGADO)
 def venta_list(request):
     # Filtros desde querystring
     fecha_desde = request.GET.get('fecha_desde', '')
@@ -74,6 +80,76 @@ def venta_list(request):
 
 
 @login_required
+@role_required(Role.ENCARGADO)
+def ventas_reporte_por_dia(request):
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+
+    qs = Venta.objects.select_related('caja')
+    if fecha_desde:
+        try:
+            qs = qs.filter(caja__fecha__gte=fecha_desde)
+        except Exception:
+            pass
+    if fecha_hasta:
+        try:
+            qs = qs.filter(caja__fecha__lte=fecha_hasta)
+        except Exception:
+            pass
+
+    rows = (
+        qs.values('caja__fecha')
+        .annotate(cantidad_ventas=Count('id'), total=Sum('total'))
+        .order_by('-caja__fecha')
+    )
+    total_general = qs.aggregate(total=Sum('total')).get('total') or Decimal('0.00')
+
+    return render(request, 'ventas/reporte_ventas_por_dia.html', {
+        'rows': rows,
+        'filtros': {'fecha_desde': fecha_desde, 'fecha_hasta': fecha_hasta},
+        'total_general': total_general,
+    })
+
+
+@login_required
+@role_required(Role.ENCARGADO)
+def ventas_reporte_por_metodo(request):
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+
+    qs = Venta.objects.select_related('caja')
+    if fecha_desde:
+        try:
+            qs = qs.filter(caja__fecha__gte=fecha_desde)
+        except Exception:
+            pass
+    if fecha_hasta:
+        try:
+            qs = qs.filter(caja__fecha__lte=fecha_hasta)
+        except Exception:
+            pass
+
+    rows = (
+        qs.values('metodo_pago')
+        .annotate(cantidad_ventas=Count('id'), total=Sum('total'))
+        .order_by('-total')
+    )
+    total_general = qs.aggregate(total=Sum('total')).get('total') or Decimal('0.00')
+
+    # Mapear display del método con choices
+    metodo_map = dict(MetodoPago.choices)
+    for r in rows:
+        r['metodo_display'] = metodo_map.get(r['metodo_pago'], r['metodo_pago'])
+
+    return render(request, 'ventas/reporte_ventas_por_metodo.html', {
+        'rows': rows,
+        'filtros': {'fecha_desde': fecha_desde, 'fecha_hasta': fecha_hasta},
+        'total_general': total_general,
+    })
+
+
+@login_required
+@role_required(Role.ENCARGADO)
 def venta_detail(request, pk):
     """Muestra detalle de una venta (productos, cantidades, precios, subtotales, total, método, fecha)."""
     venta = get_object_or_404(Venta.objects.select_related('usuario', 'caja').prefetch_related('detalles__producto'), pk=pk)
@@ -81,6 +157,7 @@ def venta_detail(request, pk):
 
 
 @login_required
+@role_required(Role.ENCARGADO)
 def venta_comprobante(request, pk):
     """Renderiza un comprobante/boleta imprimible para la venta."""
     venta = get_object_or_404(Venta.objects.select_related('usuario', 'caja').prefetch_related('detalles__producto'), pk=pk)
@@ -88,6 +165,8 @@ def venta_comprobante(request, pk):
     return render(request, 'ventas/venta_comprobante.html', {'venta': venta})
 
 
+@login_required
+@role_required(Role.ENCARGADO)
 def venta_exists(request, pk):
     """Endpoint simple que devuelve JSON indicando si la venta existe (no lanza 404).
 
@@ -98,6 +177,8 @@ def venta_exists(request, pk):
 
 
 @transaction.atomic
+@login_required
+@role_required(Role.ENCARGADO)
 def venta_create(request):
     User = get_user_model()
     
@@ -144,6 +225,49 @@ def venta_create(request):
         dformset = VentaDetalleFormSet(request.POST, form_kwargs={'unidad_choices': unidad_choices})
 
         if vform.is_valid() and dformset.is_valid():
+            def _to_decimal(val, default=Decimal('0')):
+                try:
+                    return Decimal(str(val))
+                except Exception:
+                    return default
+
+            def _compute_cantidad_base(producto, unidad_venta, cantidad_ingresada):
+                """Convierte la cantidad ingresada (unidad de venta) a cantidad_base (unidad de stock).
+
+                Regla: stock_actual_base está expresado en la unidad definida por `producto.unidad_base`.
+                - UNITARIO: UNIDAD (base = unidades)
+                - GRANEL: KG (base = kg)
+                - PACK: puede ser PACK (base = cajas) o UNIDAD (base = unidades)
+                """
+                q = _to_decimal(cantidad_ingresada)
+
+                # Normalizar a 3 decimales para mantener consistencia con los campos DecimalField(..., decimal_places=3)
+                def q3(x):
+                    try:
+                        return x.quantize(Decimal('0.001'))
+                    except Exception:
+                        return x
+
+                if unidad_venta == 'CAJA':
+                    # PACK: si el stock base está en UNIDAD, convertir cajas -> unidades
+                    if getattr(producto, 'tipo_producto', None) == 'PACK':
+                        unidades_por_pack = getattr(producto, 'unidades_por_pack', None)
+                        if getattr(producto, 'unidad_base', None) == 'UNIDAD' and unidades_por_pack:
+                            return q3(q * _to_decimal(unidades_por_pack))
+                        return q3(q)
+
+                    # GRANEL (fallback): si alguna vez se vende por caja, convertir cajas -> kg
+                    if getattr(producto, 'tipo_producto', None) == 'GRANEL':
+                        kg_por_caja = getattr(producto, 'kg_por_caja', None)
+                        if getattr(producto, 'unidad_base', None) == 'KG' and kg_por_caja:
+                            return q3(q * _to_decimal(kg_por_caja))
+                        return q3(q)
+
+                    # Otros tipos: por defecto 1 caja = 1 base
+                    return q3(q)
+
+                # UNIDAD / KG: ya están en unidad base
+                return q3(q)
             # aggregate required stock per producto
             required = {}
             detalles = []
@@ -174,8 +298,8 @@ def venta_create(request):
                             'unidad_choices': unidad_choices,
                         })
 
-                    # compute cantidad_base (simplificado)
-                    cantidad_base = cantidad_ingresada
+                    # Convertir a unidad base (para control de stock y reportes)
+                    cantidad_base = _compute_cantidad_base(producto, unidad_venta, cantidad_ingresada)
 
                     # accumulate per producto
                     required.setdefault(producto.id, Decimal('0'))
@@ -184,7 +308,8 @@ def venta_create(request):
                     # compute precio_unitario
                     precio_unitario = producto.precio_venta
 
-                    subtotal = (precio_unitario * cantidad_ingresada).quantize(Decimal('0.01'))
+                    # Subtotal debe calcularse en base a la unidad real vendida (cantidad_base)
+                    subtotal = (precio_unitario * _to_decimal(cantidad_base)).quantize(Decimal('0.01'))
 
                     detalles.append({
                         'producto': producto,
@@ -333,6 +458,7 @@ def venta_create(request):
 
 @login_required
 @require_POST
+@role_required(Role.ENCARGADO)
 def agregar_producto_ajax(request):
     """Endpoint AJAX para buscar un producto por `codigo` (o id) y devolver datos mínimos.
     Espera JSON: {"codigo": "...", "cantidad": 1}

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load format_numbers %}
+{% load roles %}
 {% block titulo %}Productos{% endblock %}
 {% block contenido %}
 <style>
@@ -29,8 +30,12 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h2 class="fw-bold text-primary"><i class="bi bi-box icon-circle icon-circle-lg"></i> Productos</h2>
   <div class="d-flex align-items-center">
+    {% if request.user|user_is_admin %}
     <a href="{% url 'producto_create' %}" class="btn btn-success shadow btn-new-product me-2"><i class="bi bi-plus-circle me-2"></i> Nuevo Producto</a>
+    {% endif %}
     <button type="button" class="btn btn-outline-primary shadow btn-new-product rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#modalAnadirStock"><i class="bi bi-stack me-2"></i> Añadir Stock</button>
+    <a href="{% url 'ingreso_stock_list' %}" class="btn btn-outline-success shadow btn-new-product rounded-pill me-2"><i class="bi bi-truck me-2"></i> Ingresos</a>
+    <a href="{% url 'productos_bajo_stock' %}" class="btn btn-outline-danger shadow btn-new-product rounded-pill me-2"><i class="bi bi-exclamation-triangle me-2"></i> Bajo stock</a>
     <div class="btn-group ms-auto" role="group" aria-label="Categorías">
       <a href="{% url 'categoria_list' %}" class="btn btn-outline-secondary shadow btn-new-product me-2"><i class="bi bi-tags me-2"></i> Listar Categorías</a>
       <button type="button" class="btn btn-outline-secondary shadow btn-new-product" data-bs-toggle="modal" data-bs-target="#modalNuevaCategoria"><i class="bi bi-plus-lg me-2"></i> Nueva Categoría</button>
@@ -142,11 +147,13 @@
                           </span>
                         </td>
                         <td class="text-center" {% if producto.bajo_stock %}style="background-color:#f8d7da !important"{% endif %}>
-                        <a href="{% url 'producto_update' producto.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
-                        <a href="{% url 'producto_delete' producto.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar">
-                          <i class="bi bi-trash"></i>
-                        </a>
-                      </td>
+                          <a href="{% url 'producto_update' producto.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
+                          {% if request.user|user_is_admin %}
+                            <a href="{% url 'producto_delete' producto.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar">
+                              <i class="bi bi-trash"></i>
+                            </a>
+                          {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="10" class="text-center text-muted">No hay productos.</td></tr>

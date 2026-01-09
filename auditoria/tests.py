@@ -1,5 +1,6 @@
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.management import call_command
 from caja.models import Caja
 from auditoria.models import Actividad
@@ -10,6 +11,10 @@ User = get_user_model()
 class ActividadCajaFlowTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('tester', 'tester@example.com', 'pass')
+        encargado, _ = Group.objects.get_or_create(name='Encargado')
+        admin, _ = Group.objects.get_or_create(name='Administrador')
+        self.user.groups.add(encargado)
+        self.user.groups.add(admin)
         self.client = Client()
         self.client.force_login(self.user)
 

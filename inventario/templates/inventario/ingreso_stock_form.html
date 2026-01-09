@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+{% block titulo %}Nuevo Ingreso de Stock{% endblock %}
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-truck icon-circle icon-circle-lg"></i> Nuevo Ingreso de Stock</h2>
+    <a href="{% url 'ingreso_stock_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
+  </div>
+
+  {% if messages %}
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080;">
+      {% for message in messages %}
+        <div class="toast align-items-center text-bg-{{ message.tags }} border-0 show mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="d-flex">
+            <div class="toast-body">{{ message }}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" class="card shadow-sm">
+    {% csrf_token %}
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.fecha.label }}</label>
+          {{ form.fecha }}
+          {% for error in form.fecha.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">{{ form.tipo_documento.label }}</label>
+          {{ form.tipo_documento }}
+          {% for error in form.tipo_documento.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-5">
+          <label class="form-label fw-semibold">{{ form.numero_documento.label }}</label>
+          {{ form.numero_documento }}
+          {% for error in form.numero_documento.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">{{ form.proveedor.label }}</label>
+          {{ form.proveedor }}
+          {% for error in form.proveedor.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">{{ form.observacion.label }}</label>
+          {{ form.observacion }}
+          {% for error in form.observacion.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+      </div>
+
+      <hr class="my-4" />
+
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Detalle (varios productos)</h5>
+        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" id="addRowBtn"><i class="bi bi-plus-lg me-1"></i> Agregar fila</button>
+      </div>
+
+      {{ formset.management_form }}
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle" id="detalleTable">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:320px;">Producto</th>
+              <th style="width:220px;">Cantidad (stock base)</th>
+              <th style="width:260px;" class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in formset.forms %}
+              <tr class="detalle-row">
+                <td>
+                  {{ f.producto }}
+                  {% for error in f.producto.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </td>
+                <td>
+                  {{ f.cantidad_base }}
+                  {% for error in f.cantidad_base.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </td>
+                <td class="text-center">
+                  <div class="d-flex justify-content-center align-items-center gap-2" style="flex-wrap:wrap;">
+
+                    {% if f.DELETE %}
+                      <div class="d-none">
+                        {{ f.DELETE }}
+                      </div>
+                    {% endif %}
+
+
+                    <input
+                      type="number"
+                      class="form-control form-control-sm remove-qty-input"
+                      inputmode="decimal"
+                      min="0"
+                      step="0.01"
+                      value="1"
+                      style="width:80px; text-align:center;"
+                      title="Cantidad a eliminar">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-qty-btn" style="border-radius: 999px;" title="Eliminar cantidad seleccionada">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger remove-all-btn" title="Eliminar todo el producto">
+                      <i class="bi bi-x-circle"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-center gap-2 mt-3">
+        <button type="submit" class="btn btn-success rounded-pill shadow btn-new-product"><i class="bi bi-check-circle me-2"></i> Registrar ingreso</button>
+        <a href="{% url 'ingreso_stock_list' %}" class="btn btn-secondary rounded-pill btn-new-product"><i class="bi bi-x-circle me-2"></i> Cancelar</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function() {
+    const addBtn = document.getElementById('addRowBtn');
+    const tableBody = document.querySelector('#detalleTable tbody');
+    const totalForms = document.getElementById('id_detalles-TOTAL_FORMS') || document.getElementById('id_ingresostockdetalle_set-TOTAL_FORMS');
+
+    function normalizeNumber(value) {
+      const n = Number(String(value ?? '').replace(',', '.'));
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function setRowDeletedState(row, isDeleted) {
+      if (!row) return;
+      // If marked deleted, hide the entire row (user asked to remove the row).
+      row.style.display = isDeleted ? 'none' : '';
+    }
+
+    function findTotalForms() {
+      return document.querySelector('input[name$="-TOTAL_FORMS"]');
+    }
+
+    function cloneLastRow() {
+      const totalFormsInput = findTotalForms();
+      if (!totalFormsInput) return;
+      const currentCount = parseInt(totalFormsInput.value, 10);
+      const rows = tableBody.querySelectorAll('tr.detalle-row');
+      if (!rows.length) return;
+      const lastRow = rows[rows.length - 1];
+      const newRow = lastRow.cloneNode(true);
+
+      // Clear values and update indexes
+      newRow.querySelectorAll('input, select').forEach(el => {
+        const name = el.getAttribute('name');
+        if (!name) return;
+        const newName = name.replace(/-(\d+)-/, '-' + currentCount + '-');
+        el.setAttribute('name', newName);
+        const id = el.getAttribute('id');
+        if (id) {
+          el.setAttribute('id', id.replace(/-(\d+)-/, '-' + currentCount + '-'));
+        }
+        if (el.type === 'checkbox') {
+          el.checked = false;
+        } else {
+          el.value = '';
+        }
+      });
+
+      // Reset UI-only controls
+      newRow.querySelectorAll('.remove-qty-input').forEach(el => { el.value = '1'; });
+      setRowDeletedState(newRow, false);
+
+      // Remove error messages in cloned row
+      newRow.querySelectorAll('.text-danger.small').forEach(n => n.remove());
+
+      tableBody.appendChild(newRow);
+      totalFormsInput.value = String(currentCount + 1);
+    }
+
+    function getRowElements(row) {
+      const qtyInput = row.querySelector('input[name$="-cantidad_base"]');
+      const deleteInput = row.querySelector('input[type="checkbox"][name$="-DELETE"], input[type="checkbox"][name$="-delete"]');
+      const removeInput = row.querySelector('.remove-qty-input');
+      return { qtyInput, deleteInput, removeInput };
+    }
+
+    if (tableBody) {
+      tableBody.addEventListener('click', function (e) {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (!btn.classList.contains('remove-qty-btn') && !btn.classList.contains('remove-all-btn')) return;
+
+        const row = btn.closest('tr.detalle-row');
+        if (!row) return;
+        const { qtyInput, deleteInput, removeInput } = getRowElements(row);
+        if (!qtyInput) return;
+
+        let qty = normalizeNumber(qtyInput.value);
+        if (btn.classList.contains('remove-all-btn')) {
+          qty = 0;
+        } else {
+          let toRemove = normalizeNumber(removeInput ? removeInput.value : 1);
+          if (toRemove <= 0) toRemove = 0;
+          qty = qty - toRemove;
+          if (qty < 0) qty = 0;
+        }
+
+        qtyInput.value = String(qty);
+        if (deleteInput) {
+          deleteInput.checked = (qty <= 0);
+          setRowDeletedState(row, deleteInput.checked);
+        } else {
+          setRowDeletedState(row, qty <= 0);
+        }
+      });
+
+      tableBody.addEventListener('change', function (e) {
+        const target = e.target;
+        if (!target || target.type !== 'checkbox') return;
+        if (!String(target.name || '').endsWith('-DELETE') && !String(target.name || '').endsWith('-delete')) return;
+        const row = target.closest('tr.detalle-row');
+        setRowDeletedState(row, target.checked);
+      });
+    }
+
+    if (addBtn) {
+      addBtn.addEventListener('click', function() {
+        cloneLastRow();
+      });
+    }
+  })();
+</script>
+{% endblock %}

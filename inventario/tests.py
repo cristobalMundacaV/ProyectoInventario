@@ -1,5 +1,6 @@
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from inventario.models import Categoria, Producto
 
 User = get_user_model()
@@ -7,6 +8,8 @@ User = get_user_model()
 class ProductoFormDefaultsTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('tester', 'tester@example.com', 'pass')
+        admin, _ = Group.objects.get_or_create(name='Administrador')
+        self.user.groups.add(admin)
         self.client = Client()
         self.client.force_login(self.user)
         self.cat = Categoria.objects.create(nombre='T')
@@ -53,6 +56,10 @@ class ProductoFormDefaultsTests(TestCase):
         from caja.models import Caja
         from decimal import Decimal
         import datetime
+
+        # producto_unlink is admin-only
+        admin_group, _ = Group.objects.get_or_create(name='Administrador')
+        self.user.groups.add(admin_group)
 
         p = Producto.objects.create(
             codigo_barra='F001',

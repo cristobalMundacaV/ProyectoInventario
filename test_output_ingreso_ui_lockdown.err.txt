@@ -1,0 +1,9 @@
+Creating test database for alias 'default'...
+.....C:\Users\Mundaca\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\db\models\fields\__init__.py:1670: RuntimeWarning: DateTimeField Caja.hora_apertura received a naive datetime (2026-01-09 18:01:13.988703) while time zone support is active.
+  warnings.warn(
+....
+----------------------------------------------------------------------
+Ran 9 tests in 17.888s
+
+OK
+Destroying test database for alias 'default'...
