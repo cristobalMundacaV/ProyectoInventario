@@ -9,6 +9,8 @@
         </div>
         <div class="card shadow border-0">
             <div class="card-body">
+                <!-- Toast container for inline messages (top-right) -->
+                <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080; display:none;" id="ventaToastContainer"></div>
                 <form method="post" id="ventaForm">
                     {% csrf_token %}
                     {{ dformset.management_form }}
@@ -21,7 +23,7 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Cantidad</label>
-                            <input type="number" id="defaultQuantity" class="form-control" value="1" step="1.0" min="0.000">
+                            <input type="number" id="defaultQuantity" class="form-control" value="1" step="1.0" min="0.001">
                         </div>
                         <div class="col-md-4">
                             <button type="button" id="btnAgregarProducto" class="btn btn-success shadow btn-new-product" style="height:50px; font-size:16px;">
@@ -74,7 +76,7 @@
     <div class="col-12 col-md-10 col-lg-11 mx-auto">
         <div class="card shadow border-0">
             <div class="card-header bg-primary text-white fw-bold">
-                <i class="bi bi-currency-dollar"></i> Datos de la Venta
+                <ib></i> Datos de la Venta
             </div>
             <div class="card-body">
                 <form method="post" id="ventaSubmitForm">
@@ -161,14 +163,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         if (!product) {
-            alert('Producto no encontrado: ' + barcode);
+            showInlineMessage('Producto no encontrado: ' + barcode, 'danger');
             return false;
         }
 
         // Verificar stock
         const availableStock = parseFloat(stockMap[product.id]);
         if (quantity > availableStock) {
-            alert('Stock insuficiente. Disponible: ' + availableStock);
+            showInlineMessage('Stock insuficiente. Disponible: ' + availableStock, 'danger');
             return false;
         }
 
@@ -181,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const newQty = currentQty + quantity;
             
             if (newQty > availableStock) {
-                alert('Stock insuficiente. Disponible: ' + availableStock);
+                showInlineMessage('Stock insuficiente. Disponible: ' + availableStock, 'danger');
                 return false;
             }
             
@@ -354,12 +356,108 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const csrftoken = getCookie('csrftoken');
     const scannerElement = document.getElementById('barcodeScanner');
+    const MIN_QUANTITY = 0.001;
+    function isValidQuantityString(s) {
+        if (s === null || s === undefined) return false;
+        s = String(s).trim();
+        // Only allow digits and optional single decimal point, no signs, no other chars
+        // Examples valid: 1, 1.0, 0.001, 12.5
+        return /^\d+(?:\.\d+)?$/.test(s);
+    }
+    function showInlineMessage(msg, type) {
+        var container = document.getElementById('ventaToastContainer');
+        if (!container) {
+            // create toast container dynamically if missing
+            container = document.createElement('div');
+            container.id = 'ventaToastContainer';
+            container.className = 'toast-container position-fixed top-0 end-0 p-3';
+            container.style.zIndex = '1080';
+            container.style.display = 'block';
+            container.style.top = '0px';
+            container.style.right = '1rem';
+            document.body.appendChild(container);
+        } else {
+            container.style.display = 'block';
+            container.style.top = '0px';
+            container.style.right = '1rem';
+        }
+            // Prevent spam: dedupe identical messages and cap concurrent toasts
+            window.__ventaActiveToasts = window.__ventaActiveToasts || {};
+            window.__ventaToastOrder = window.__ventaToastOrder || [];
+            var MAX_TOASTS = 3;
+            var key = (type || 'info') + '|' + String(msg);
+
+            function removeToastByKey(k) {
+                try {
+                    var entry = window.__ventaActiveToasts[k];
+                    if (entry && entry.element) entry.element.remove();
+                } catch (e) {}
+                try { if (window.__ventaActiveToasts[k] && window.__ventaActiveToasts[k].timeout) clearTimeout(window.__ventaActiveToasts[k].timeout); } catch (e) {}
+                delete window.__ventaActiveToasts[k];
+                var idx = window.__ventaToastOrder.indexOf(k);
+                if (idx !== -1) window.__ventaToastOrder.splice(idx, 1);
+                if (container && !container.children.length) container.style.display = 'none';
+            }
+
+            // If same message already shown, refresh its timer and pulse it
+            if (window.__ventaActiveToasts[key]) {
+                var existing = window.__ventaActiveToasts[key];
+                try {
+                    existing.element.classList.remove('show');
+                    void existing.element.offsetWidth;
+                    existing.element.classList.add('show');
+                } catch (e) {}
+                try { clearTimeout(existing.timeout); } catch (e) {}
+                existing.timeout = setTimeout(function() { removeToastByKey(key); }, 3500);
+                return;
+            }
+
+            // If too many toasts, remove oldest
+            if (window.__ventaToastOrder.length >= MAX_TOASTS) {
+                var oldest = window.__ventaToastOrder.shift();
+                removeToastByKey(oldest);
+            }
+
+            var level = 'info';
+            if (type === 'danger' || type === 'error') level = 'danger';
+            if (type === 'warning') level = 'warning';
+            if (type === 'success') level = 'success';
+            var toast = document.createElement('div');
+            toast.className = 'toast align-items-center text-bg-' + level + ' border-0 show mb-2';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            toast.innerHTML = '<div class="d-flex"><div class="toast-body">' + String(msg) + '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
+            container.appendChild(toast);
+
+            var timeoutId = setTimeout(function() { removeToastByKey(key); }, 3500);
+            window.__ventaActiveToasts[key] = { element: toast, timeout: timeoutId };
+            window.__ventaToastOrder.push(key);
+
+            try {
+                var bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+                bsToast.show();
+            } catch (e) {}
+    }
     if (scannerElement) {
         scannerElement.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const barcode = this.value.trim();
-                const quantity = parseFloat(document.getElementById('defaultQuantity').value) || 1;
+                const rawQ = document.getElementById('defaultQuantity').value;
+                if (!isValidQuantityString(rawQ)) {
+                    showInlineMessage('Cantidad inválida. Use sólo números y un punto decimal (ej. 1 o 0.5).', 'danger');
+                    document.getElementById('defaultQuantity').value = '1';
+                    scannerElement.focus();
+                    return;
+                }
+                let quantity = parseFloat(rawQ);
+                if (isNaN(quantity) || quantity < MIN_QUANTITY) {
+                    showInlineMessage('Cantidad inválida. Debe ser mayor que 0.', 'danger');
+                    document.getElementById('defaultQuantity').value = '1';
+                    scannerElement.focus();
+                    return;
+                }
 
                 if (!barcode) return;
 
@@ -387,11 +485,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             scannerElement.focus();
                         }
                     } else {
-                        alert(data && data.error ? data.error : 'Producto no encontrado');
+                        showInlineMessage(data && data.error ? data.error : 'Producto no encontrado', 'danger');
                     }
                 }).catch(function(err) {
                     console.error(err);
-                    alert('Error al consultar el producto');
+                    showInlineMessage('Error al consultar el producto', 'danger');
                 });
             }
         });
@@ -404,10 +502,21 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const barcodeInput = document.getElementById('barcodeScanner');
             const barcode = barcodeInput ? barcodeInput.value.trim() : '';
-            const quantity = parseFloat(document.getElementById('defaultQuantity').value) || 1;
+            const rawQ = document.getElementById('defaultQuantity').value;
+            if (!isValidQuantityString(rawQ)) {
+                showInlineMessage('Cantidad inválida. Use sólo números y un punto decimal (ej. 1 o 0.5).', 'danger');
+                document.getElementById('defaultQuantity').value = '1';
+                return;
+            }
+            let quantity = parseFloat(rawQ);
+            if (isNaN(quantity) || quantity < MIN_QUANTITY) {
+                showInlineMessage('Cantidad inválida. Debe ser mayor que 0.', 'danger');
+                document.getElementById('defaultQuantity').value = '1';
+                return;
+            }
 
             if (!barcode) {
-                alert('Ingrese el código de barras o escanee un producto.');
+                showInlineMessage('Ingrese el código de barras o escanee un producto.', 'warning');
                 if (barcodeInput) barcodeInput.focus();
                 return;
             }

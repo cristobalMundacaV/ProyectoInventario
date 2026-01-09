@@ -153,6 +153,27 @@ def venta_create(request):
                     unidad_venta = form.cleaned_data['unidad_venta']
                     cantidad_ingresada = form.cleaned_data['cantidad_ingresada']
 
+                    # Reject non-positive quantities (server-side protection)
+                    try:
+                        if Decimal(cantidad_ingresada) <= 0:
+                            messages.error(request, 'Cantidad inválida en alguno de los productos (debe ser mayor que 0).')
+                            return render(request, 'ventas/venta_form.html', {
+                                'vform': vform,
+                                'dformset': dformset,
+                                'products': products_data,
+                                'product_stock_map': product_stock_map,
+                                'unidad_choices': unidad_choices,
+                            })
+                    except Exception:
+                        messages.error(request, 'Cantidad inválida en alguno de los productos.')
+                        return render(request, 'ventas/venta_form.html', {
+                            'vform': vform,
+                            'dformset': dformset,
+                            'products': products_data,
+                            'product_stock_map': product_stock_map,
+                            'unidad_choices': unidad_choices,
+                        })
+
                     # compute cantidad_base (simplificado)
                     cantidad_base = cantidad_ingresada
 

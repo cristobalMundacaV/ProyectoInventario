@@ -116,7 +116,7 @@
                             <div class="input-group">
                             <input id="comprobante-id" type="number" min="1" class="form-control" placeholder="ID venta" aria-label="ID venta" required aria-required="true">
                             <button id="go-comprobante" class="btn btn-outline-primary shadow btn-new-product ms-2" type="button">Ir a boleta</button>
-                            <div id="comprobante-feedback" class="invalid-feedback" style="display:none;">Ingrese el ID de la venta</div>
+                            <!-- feedback moved to inline toasts -->
                         </div>
                     </div>
                 </div>
@@ -256,10 +256,7 @@
         if (!id) {
             if (input) {
                 input.classList.add('is-invalid');
-                if (feedback) {
-                    feedback.textContent = 'ESTE CAMPO ES OBLIGATORIO';
-                    feedback.style.display = 'block';
-                }
+                showInlineMessage('Este campo es obligatorio', 'danger');
                 input.focus();
             }
             return;
@@ -283,23 +280,80 @@
                         } else {
                             if (input) {
                                 input.classList.add('is-invalid');
-                                if (feedback) {
-                                    feedback.textContent = 'ID VENTA ERRÓNEO';
-                                    feedback.style.display = 'block';
-                                }
+                                showInlineMessage('ID venta erróneo', 'danger');
                             }
                         }
                     })
                     .catch(function() {
                         if (input) {
                             input.classList.add('is-invalid');
-                            if (feedback) {
-                                feedback.textContent = 'No se pudo verificar el ID. Intente de nuevo';
-                                feedback.style.display = 'block';
-                            }
+                            showInlineMessage('No se pudo verificar el ID. Intente de nuevo', 'danger');
                         }
                     });
     });
 })();
+</script>
+<script>
+// Inline toast helper for home (dedupe + cap)
+function showInlineMessage(msg, type) {
+    var container = document.getElementById('homeToastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'homeToastContainer';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3';
+        container.style.zIndex = '1080';
+        container.style.display = 'block';
+        document.body.appendChild(container);
+    } else {
+        container.style.display = 'block';
+    }
+
+    window.__homeActiveToasts = window.__homeActiveToasts || {};
+    window.__homeToastOrder = window.__homeToastOrder || [];
+    var MAX_TOASTS = 3;
+    var key = (type || 'info') + '|' + String(msg);
+
+    function removeToastByKey(k) {
+        try {
+            var entry = window.__homeActiveToasts[k];
+            if (entry && entry.element) entry.element.remove();
+        } catch (e) {}
+        try { if (window.__homeActiveToasts[k] && window.__homeActiveToasts[k].timeout) clearTimeout(window.__homeActiveToasts[k].timeout); } catch (e) {}
+        delete window.__homeActiveToasts[k];
+        var idx = window.__homeToastOrder.indexOf(k);
+        if (idx !== -1) window.__homeToastOrder.splice(idx, 1);
+        if (container && !container.children.length) container.style.display = 'none';
+    }
+
+    if (window.__homeActiveToasts[key]) {
+        var existing = window.__homeActiveToasts[key];
+        try { existing.element.classList.remove('show'); void existing.element.offsetWidth; existing.element.classList.add('show'); } catch (e) {}
+        try { clearTimeout(existing.timeout); } catch (e) {}
+        existing.timeout = setTimeout(function() { removeToastByKey(key); }, 3500);
+        return;
+    }
+
+    if (window.__homeToastOrder.length >= MAX_TOASTS) {
+        var oldest = window.__homeToastOrder.shift();
+        removeToastByKey(oldest);
+    }
+
+    var level = 'info';
+    if (type === 'danger' || type === 'error') level = 'danger';
+    if (type === 'warning') level = 'warning';
+    if (type === 'success') level = 'success';
+    var toast = document.createElement('div');
+    toast.className = 'toast align-items-center text-bg-' + level + ' border-0 show mb-2';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    toast.innerHTML = '<div class="d-flex"><div class="toast-body">' + String(msg) + '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
+    container.appendChild(toast);
+
+    var timeoutId = setTimeout(function() { removeToastByKey(key); }, 3500);
+    window.__homeActiveToasts[key] = { element: toast, timeout: timeoutId };
+    window.__homeToastOrder.push(key);
+    try { var bsToast = new bootstrap.Toast(toast, { delay: 3000 }); bsToast.show(); } catch (e) {}
+}
 </script>
 {% endblock %}
