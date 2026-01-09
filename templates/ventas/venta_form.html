@@ -203,7 +203,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 '<td data-field="cantidad">' + formatQuantity(quantity) + '</td>' +
                 '<td data-field="unidad">' + unidadDisplay + '</td>' +
                 '<td data-field="subtotal">$' + formatDecimal(subtotal, 0) + '</td>' +
-                '<td><button type="button" class="btn btn-sm btn-outline-danger remove-product" style="border-radius: 999px;"><i class="bi bi-trash"></i></button></td>';
+                    '<td class="d-flex align-items-center justify-content-center gap-2">'
+                        + '<input type="number" min="1" step="1" value="1" class="form-control form-control-sm remove-qty-input" style="width:70px; text-align:center;" title="Cantidad a eliminar">'
+                        + '<button type="button" class="btn btn-sm btn-outline-danger remove-product" style="border-radius: 999px;" title="Eliminar cantidad seleccionada"><i class="bi bi-trash"></i></button>'
+                        + '<button type="button" class="btn btn-sm btn-danger remove-product-all" title="Eliminar todo el producto" '
+                        + 'style="width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;">'
+                        + '<i class="bi bi-x-lg text-white" style="font-size:0.85rem;line-height:1;"></i>'
+                        + '</button>'
+                        + '</td>';
             
             tbody.appendChild(row);
             attachRowEvents(row);
@@ -244,8 +251,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function attachRowEvents(row) {
         const removeBtn = row.querySelector('.remove-product');
+        const removeQtyInput = row.querySelector('.remove-qty-input');
         if (removeBtn) {
             removeBtn.addEventListener('click', function() {
+                const qtyCell = row.querySelector('td[data-field="cantidad"]');
+                const currentQty = parseFloat(qtyCell.textContent) || 0;
+                const toRemove = removeQtyInput ? (parseFloat(removeQtyInput.value) || 0) : 0;
+
+                if (toRemove > 0) {
+                    const newQty = currentQty - toRemove;
+                    if (newQty > 0) {
+                        qtyCell.textContent = formatQuantity(newQty);
+                        updateRowSubtotal(row);
+                        updateTotal();
+                        updateHiddenFields();
+                        return;
+                    }
+                }
+                // Si no quedó cantidad o toRemove inválido, eliminar la fila
+                row.remove();
+                updateTotal();
+                updateHiddenFields();
+            });
+        }
+
+        if (removeQtyInput) {
+            removeQtyInput.addEventListener('click', function(e) { e.stopPropagation(); });
+            removeQtyInput.addEventListener('keydown', function(e) { e.stopPropagation(); });
+        }
+        const removeAllBtn = row.querySelector('.remove-product-all');
+        if (removeAllBtn) {
+            removeAllBtn.addEventListener('click', function() {
                 row.remove();
                 updateTotal();
                 updateHiddenFields();
