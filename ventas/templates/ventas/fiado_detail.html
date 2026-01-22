@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% load format_numbers %}
+
+{% block titulo %}Fiado #{{ fiado.id }}{% endblock %}
+
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-journal-text icon-circle icon-circle-lg"></i> Fiado #{{ fiado.id }}</h2>
+    <div class="d-flex gap-2">
+      <a href="{% url 'fiado_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
+      <a href="{% url 'fiado_create' %}" class="btn btn-success rounded-pill shadow btn-new-product"><i class="bi bi-plus-circle me-2"></i> Nuevo Fiado</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white"><strong>Datos</strong></div>
+        <div class="card-body">
+          <p class="mb-2"><strong>Fecha:</strong> {{ fiado.fecha|date:"Y-m-d H:i" }}</p>
+          <p class="mb-2"><strong>Cliente:</strong> {{ fiado.cliente_nombre }}</p>
+          <p class="mb-2"><strong>Teléfono:</strong> {{ fiado.cliente_telefono|default:"-" }}</p>
+          <p class="mb-2"><strong>RUT:</strong> {{ fiado.cliente_rut|default:"-" }}</p>
+          <p class="mb-2"><strong>Usuario:</strong> {{ fiado.usuario.username }}</p>
+          <p class="mb-2"><strong>Caja:</strong> {{ fiado.caja.id }} ({{ fiado.caja.fecha|date:"d/m/Y" }})</p>
+          <p class="mb-2"><strong>Total:</strong> ${{ fiado.total|format_money }}</p>
+          <p class="mb-2"><strong>Saldo:</strong> <span class="fw-bold">${{ fiado.saldo|format_money }}</span></p>
+          <p class="mb-0"><strong>Estado:</strong>
+            {% if fiado.estado == 'ABIERTO' %}
+              <span class="badge bg-warning text-dark">Abierto</span>
+            {% elif fiado.estado == 'PAGADO' %}
+              <span class="badge bg-success">Pagado</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ fiado.estado }}</span>
+            {% endif %}
+          </p>
+          {% if fiado.observacion %}
+            <hr>
+            <p class="mb-0"><strong>Observación:</strong> {{ fiado.observacion }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-header bg-white"><strong>Registrar Abono</strong></div>
+        <div class="card-body">
+          {% if fiado.estado != 'ABIERTO' %}
+            <div class="alert alert-info mb-0">Este fiado no está abierto para abonos.</div>
+          {% else %}
+            <form method="post" action="{% url 'fiado_abonar' fiado.id %}" novalidate>
+              {% csrf_token %}
+              <div class="mb-3">
+                <label class="form-label">Método de pago</label>
+                {{ abono_form.metodo_pago }}
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Monto</label>
+                {{ abono_form.monto }}
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Referencia (opcional)</label>
+                {{ abono_form.referencia }}
+              </div>
+              <button type="submit" class="btn btn-primary"><i class="bi bi-cash-coin me-2"></i> Registrar abono</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-7">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white"><strong>Detalle</strong></div>
+        <div class="table-responsive">
+          <table class="table table-striped mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Producto</th>
+                <th class="text-end">Cantidad</th>
+                <th>Unidad</th>
+                <th class="text-end">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for det in fiado.detalles.all %}
+                <tr>
+                  <td>{{ det.producto.nombre }}</td>
+                  <td class="text-end">{{ det.cantidad_ingresada|floatformat:"-3" }}</td>
+                  <td>{{ det.unidad_venta }}</td>
+                  <td class="text-end">${{ det.subtotal|format_money }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Sin items.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-header bg-white"><strong>Abonos</strong></div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Usuario</th>
+                <th>Método</th>
+                <th class="text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in fiado.abonos.all %}
+                <tr>
+                  <td>{{ a.fecha|date:"Y-m-d H:i" }}</td>
+                  <td>{{ a.usuario.username }}</td>
+                  <td>{{ a.get_metodo_pago_display }}</td>
+                  <td class="text-end">${{ a.monto|format_money }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Aún no hay abonos.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

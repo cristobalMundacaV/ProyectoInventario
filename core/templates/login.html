@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block titulo %}Iniciar Sesión{% endblock %}
+
+{% block contenido %}
+<div class="logo-titulo">🔐 Iniciar Sesión</div>
+
+{% if form.non_field_errors %}
+    <div class="alert alert-danger small py-1 px-2 text-start" role="alert">
+        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+{% endif %}
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="id_username" class="form-label">Usuario</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                        {% for error in form.username.errors %}<div>{{ error }}</div>{% endfor %}
+                    </div>
+                {% endif %}
+    </div>
+    <div class="mb-3">
+        <label for="id_password" class="form-label">Contraseña</label>
+                {{ form.password }}
+                {% if form.password.errors %}
+                    <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                        {% for error in form.password.errors %}<div>{{ error }}</div>{% endfor %}
+                    </div>
+                {% endif %}
+    </div>
+        <button type="submit" class="btn btn-custom w-100" formnovalidate>Iniciar Sesión</button>
+</form>
+{% endblock %}

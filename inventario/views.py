@@ -4,9 +4,23 @@ from django.db.models.deletion import ProtectedError
 from django.contrib import messages
 from django.db import transaction
 from django.forms import inlineformset_factory
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
-from .models import Producto, Categoria, IngresoStock, IngresoStockDetalle
-from .forms import ProductoForm, AnadirStockForm, IngresoStockForm, IngresoStockDetalleForm
+from .models import (
+    Producto,
+    Categoria,
+    IngresoStock,
+    IngresoStockDetalle,
+    annotate_stock_actual_alerta,
+    bajo_stock_queryset,
+)
+from .forms import (
+    ProductoForm,
+    AnadirStockForm,
+    IngresoStockForm,
+    IngresoStockDetalleForm,
+    IngresoStockDetalleRequiredFormSet,
+)
 from inventario.templatetags.format_numbers import format_decimal
 from auditoria.models import Actividad
 from caja.models import Caja
@@ -21,7 +35,7 @@ from core.roles import is_admin
 
 # --- Vista para añadir stock ---
 @login_required
-@role_required(Role.ENCARGADO)
+@admin_required
 def anadir_stock(request):
     if request.method == 'POST':
         form = AnadirStockForm(request.POST)
@@ -96,6 +110,9 @@ from django import forms
 
 
 class CategoriaForm(forms.ModelForm):
+    # Evita validación HTML5 del navegador (mensajes en inglés) y deja que Django muestre errores.
+    use_required_attribute = False
+
     class Meta:
         model = Categoria
         fields = ['nombre', 'descripcion']
@@ -104,8 +121,17 @@ class CategoriaForm(forms.ModelForm):
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'nombre' in self.fields:
+            self.fields['nombre'].error_messages.update({
+                'required': 'Este campo es obligatorio.',
+            })
+
     def clean_nombre(self):
         nombre = (self.cleaned_data.get('nombre') or '').strip()
+        if not nombre:
+            raise ValidationError('Este campo es obligatorio.')
         qs = Categoria.objects.filter(nombre__iexact=nombre)
         if self.instance and getattr(self.instance, 'pk', None):
             qs = qs.exclude(pk=self.instance.pk)
@@ -115,7 +141,7 @@ class CategoriaForm(forms.ModelForm):
 
 
 @login_required
-@role_required(Role.ENCARGADO)
+@admin_required
 def categoria_create(request):
     if request.method == 'POST':
         form = CategoriaForm(request.POST)
@@ -161,15 +187,25 @@ def categoria_create(request):
 @login_required
 @role_required(Role.ENCARGADO)
 def categoria_list(request):
+    page = request.GET.get('page', 1)
     categorias = Categoria.objects.all().order_by('nombre')
-    # incluir conteo de productos por categoría en la plantilla
+    
+    # Paginación
+    paginator = Paginator(categorias, 50)  # 50 por página
+    try:
+        categorias = paginator.page(page)
+    except PageNotAnInteger:
+        categorias = paginator.page(1)
+    except EmptyPage:
+        categorias = paginator.page(paginator.num_pages)
+    
     return render(request, 'inventario/categoria_list.html', {
         'categorias': categorias,
     })
 
 
 @login_required
-@role_required(Role.ENCARGADO)
+@admin_required
 def categoria_update(request, pk):
     categoria = get_object_or_404(Categoria, pk=pk)
     if request.method == 'POST':
@@ -239,6 +275,7 @@ def producto_list(request):
     categoria = request.GET.get('categoria', '')
     codigo_barra = request.GET.get('codigo_barra', '')
     bajo_stock_flag = request.GET.get('bajo_stock')
+    page = request.GET.get('page', 1)
 
     productos = Producto.objects.all()
     if nombre:
@@ -248,16 +285,31 @@ def producto_list(request):
     if codigo_barra:
         productos = productos.filter(codigo_barra__icontains=codigo_barra)
 
+    # Unificar lógica de bajo stock (incluye PACK vendidos por UNIDAD)
+    productos = annotate_stock_actual_alerta(productos)
+
     # Si se pidió filtrar por bajo stock, limitar el queryset
     if bajo_stock_flag:
-        # Considerar sólo productos con stock_minimo > 0 y stock_actual_base <= stock_minimo
-        productos = productos.filter(stock_minimo__gt=0).filter(stock_actual_base__lte=F('stock_minimo'))
+        productos = productos.filter(stock_minimo__gt=0).filter(stock_actual_alerta__lte=F('stock_minimo'))
 
-    categorias = Categoria.objects.all()
+    # Paginación
+    paginator = Paginator(productos, 50)  # 50 por página
+    try:
+        productos = paginator.page(page)
+    except PageNotAnInteger:
+        productos = paginator.page(1)
+    except EmptyPage:
+        productos = paginator.page(paginator.num_pages)
+
     # Mark products that are at or below minimum stock for the template
     for p in productos:
         try:
-            p.bajo_stock = (p.stock_actual_base is not None and p.stock_minimo is not None and p.stock_actual_base <= p.stock_minimo)
+            p.bajo_stock = (
+                p.stock_actual_alerta is not None
+                and p.stock_minimo is not None
+                and (p.stock_minimo or 0) > 0
+                and p.stock_actual_alerta <= p.stock_minimo
+            )
         except Exception:
             p.bajo_stock = False
     # Instanciar formularios para mostrarlos en la vista de lista (modales)
@@ -266,7 +318,7 @@ def producto_list(request):
 
     return render(request, 'inventario/producto_list.html', {
         'productos': productos,
-        'categorias': categorias,
+        'categorias': Categoria.objects.all(),
         'filtros': {
             'nombre': nombre,
             'categoria': categoria,
@@ -281,7 +333,18 @@ def producto_list(request):
 @login_required
 @role_required(Role.ENCARGADO)
 def ingreso_stock_list(request):
+    page = request.GET.get('page', 1)
     ingresos = IngresoStock.objects.select_related('usuario').prefetch_related('detalles').order_by('-fecha')
+    
+    # Paginación
+    paginator = Paginator(ingresos, 50)  # 50 por página
+    try:
+        ingresos = paginator.page(page)
+    except PageNotAnInteger:
+        ingresos = paginator.page(1)
+    except EmptyPage:
+        ingresos = paginator.page(paginator.num_pages)
+    
     return render(request, 'inventario/ingreso_stock_list.html', {
         'ingresos': ingresos,
     })
@@ -300,12 +363,13 @@ def ingreso_stock_detail(request, pk):
 
 
 @login_required
-@role_required(Role.ENCARGADO)
+@admin_required
 def ingreso_stock_create(request):
     DetalleFormSet = inlineformset_factory(
         IngresoStock,
         IngresoStockDetalle,
         form=IngresoStockDetalleForm,
+        formset=IngresoStockDetalleRequiredFormSet,
         extra=5,
         can_delete=True,
     )
@@ -394,7 +458,7 @@ def ingreso_stock_create(request):
 @login_required
 @role_required(Role.ENCARGADO)
 def productos_bajo_stock(request):
-    productos = Producto.objects.filter(stock_minimo__gt=0).filter(stock_actual_base__lte=F('stock_minimo')).order_by('nombre')
+    productos = bajo_stock_queryset(Producto.objects.all()).order_by('nombre')
     for p in productos:
         p.bajo_stock = True
     return render(request, 'inventario/productos_bajo_stock.html', {
@@ -415,12 +479,8 @@ def producto_create(request):
                 # Mostrar error al usuario con detalles mínimos para depuración
                 messages.error(request, f'Error al guardar el producto: {str(e)}')
         else:
-            # Mostrar errores de validación en un mensaje para facilitar depuración en UI
-            try:
-                errores = producto_form.errors.as_text()
-            except Exception:
-                errores = str(producto_form.errors)
-            messages.error(request, 'No se pudo guardar el producto. Errores: ' + errores)
+            # Evitar mostrar errores crudos (pueden salir en inglés). El template renderiza errores en rojo.
+            messages.error(request, 'No se pudo guardar el producto. Revise los campos marcados en rojo.')
     else:
         producto_form = ProductoForm(user=request.user)
 
@@ -459,9 +519,15 @@ def producto_create(request):
     # Ensure precio_compra and precio_venta display with correct step/format
     for pname in ('precio_compra', 'precio_venta'):
         if pname in producto_form.fields:
+            # Si el form ya calculó un initial (p.ej. costo total caja/pack), no lo pisamos.
+            if pname == 'precio_compra' and not producto_form.is_bound and pname in getattr(producto_form, 'initial', {}):
+                # Igual ajustamos step abajo.
+                pass
             if tipo == 'GRANEL':
                 producto_form.fields[pname].widget.attrs.update({'step': '0.01'})
                 if not producto_form.is_bound:
+                    if pname == 'precio_compra' and pname in getattr(producto_form, 'initial', {}):
+                        continue
                     val = getattr(producto_form.instance, pname, None)
                     if val is not None:
                         try:
@@ -471,6 +537,8 @@ def producto_create(request):
             else:
                 producto_form.fields[pname].widget.attrs.update({'step': '1'})
                 if not producto_form.is_bound:
+                    if pname == 'precio_compra' and pname in getattr(producto_form, 'initial', {}):
+                        continue
                     val = getattr(producto_form.instance, pname, None)
                     if val is not None:
                         try:
@@ -486,7 +554,7 @@ def producto_create(request):
 
 
 @login_required
-@role_required(Role.ENCARGADO)
+@admin_required
 def producto_update(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
     can_edit_prices = is_admin(request.user)
@@ -516,11 +584,8 @@ def producto_update(request, pk):
             except Exception as e:
                 messages.error(request, f'Error al actualizar el producto: {str(e)}')
         else:
-            try:
-                errores = form.errors.as_text()
-            except Exception:
-                errores = str(form.errors)
-            messages.error(request, 'No se pudo actualizar el producto. Errores: ' + errores)
+            # Evitar mostrar errores crudos (pueden salir en inglés). El template renderiza errores en rojo.
+            messages.error(request, 'No se pudo actualizar el producto. Revise los campos marcados en rojo.')
     else:
         form = ProductoForm(instance=producto, user=request.user)
     # Ensure stock fields use integer step and show integer values when product is not GRANEL.
@@ -559,9 +624,14 @@ def producto_update(request, pk):
     # Ensure precio_compra and precio_venta display with correct step/format
     for pname in ('precio_compra', 'precio_venta'):
         if pname in form.fields:
+            # Si el form ya calculó un initial (p.ej. costo total caja/pack), no lo pisamos.
+            if pname == 'precio_compra' and not form.is_bound and pname in getattr(form, 'initial', {}):
+                pass
             if tipo == 'GRANEL':
                 form.fields[pname].widget.attrs.update({'step': '0.01'})
                 if not form.is_bound:
+                    if pname == 'precio_compra' and pname in getattr(form, 'initial', {}):
+                        continue
                     val = getattr(form.instance, pname, None)
                     if val is not None:
                         try:
@@ -571,6 +641,8 @@ def producto_update(request, pk):
             else:
                 form.fields[pname].widget.attrs.update({'step': '1'})
                 if not form.is_bound:
+                    if pname == 'precio_compra' and pname in getattr(form, 'initial', {}):
+                        continue
                     val = getattr(form.instance, pname, None)
                     if val is not None:
                         try:
@@ -604,7 +676,7 @@ def producto_delete(request, pk):
 
 
 @login_required
-@role_required(Role.ENCARGADO)
+@admin_required
 def producto_deactivate(request, pk):
     producto = get_object_or_404(Producto, pk=pk)
     if request.method == 'POST':

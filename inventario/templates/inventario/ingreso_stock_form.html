@@ -1,16 +1,11 @@
 {% extends 'base.html' %}
 {% block titulo %}Nuevo Ingreso de Stock{% endblock %}
-{% block contenido %}
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="fw-bold text-primary"><i class="bi bi-truck icon-circle icon-circle-lg"></i> Nuevo Ingreso de Stock</h2>
-    <a href="{% url 'ingreso_stock_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
-  </div>
 
+{% block messages_area %}
   {% if messages %}
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080;">
       {% for message in messages %}
-        <div class="toast align-items-center text-bg-{{ message.tags }} border-0 show mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast align-items-center text-bg-{% if 'error' in message.tags %}danger{% else %}{{ message.tags }}{% endif %} border-0 show mb-2" role="alert" aria-live="assertive" aria-atomic="true">
           <div class="d-flex">
             <div class="toast-body">{{ message }}</div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
@@ -19,6 +14,14 @@
       {% endfor %}
     </div>
   {% endif %}
+{% endblock %}
+
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-truck icon-circle icon-circle-lg"></i> Nuevo Ingreso de Stock</h2>
+    <a href="{% url 'ingreso_stock_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
+  </div>
 
   <form method="post" class="card shadow-sm">
     {% csrf_token %}
@@ -74,11 +77,19 @@
               <tr class="detalle-row">
                 <td>
                   {{ f.producto }}
-                  {% for error in f.producto.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                  {% if f.producto.errors %}
+                    <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                      {% for error in f.producto.errors %}<div>{{ error }}</div>{% endfor %}
+                    </div>
+                  {% endif %}
                 </td>
                 <td>
                   {{ f.cantidad_base }}
-                  {% for error in f.cantidad_base.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                  {% if f.cantidad_base.errors %}
+                    <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                      {% for error in f.cantidad_base.errors %}<div>{{ error }}</div>{% endfor %}
+                    </div>
+                  {% endif %}
                 </td>
                 <td class="text-center">
                   <div class="d-flex justify-content-center align-items-center gap-2" style="flex-wrap:wrap;">
@@ -90,18 +101,20 @@
                     {% endif %}
 
 
-                    <input
-                      type="number"
-                      class="form-control form-control-sm remove-qty-input"
-                      inputmode="decimal"
-                      min="0"
-                      step="0.01"
-                      value="1"
-                      style="width:80px; text-align:center;"
-                      title="Cantidad a eliminar">
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-qty-btn" style="border-radius: 999px;" title="Eliminar cantidad seleccionada">
-                      <i class="bi bi-trash"></i>
-                    </button>
+                    <span class="partial-remove-controls d-inline-flex align-items-center gap-2">
+                      <input
+                        type="number"
+                        class="form-control form-control-sm remove-qty-input"
+                        inputmode="decimal"
+                        min="0"
+                        step="0.01"
+                        value="1"
+                        style="width:80px; text-align:center;"
+                        title="Cantidad a eliminar">
+                      <button type="button" class="btn btn-sm btn-outline-danger remove-qty-btn" style="border-radius: 999px;" title="Eliminar cantidad seleccionada">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </span>
                     <button type="button" class="btn btn-sm btn-danger remove-all-btn" title="Eliminar todo el producto">
                       <i class="bi bi-x-circle"></i>
                     </button>
@@ -183,10 +196,22 @@
       const qtyInput = row.querySelector('input[name$="-cantidad_base"]');
       const deleteInput = row.querySelector('input[type="checkbox"][name$="-DELETE"], input[type="checkbox"][name$="-delete"]');
       const removeInput = row.querySelector('.remove-qty-input');
-      return { qtyInput, deleteInput, removeInput };
+      const partialControls = row.querySelector('.partial-remove-controls');
+      return { qtyInput, deleteInput, removeInput, partialControls };
+    }
+
+    function updatePartialRemoveVisibility(row) {
+      if (!row) return;
+      const { qtyInput, partialControls } = getRowElements(row);
+      if (!qtyInput || !partialControls) return;
+      const qty = normalizeNumber(qtyInput.value);
+      partialControls.style.display = (qty > 1) ? '' : 'none';
     }
 
     if (tableBody) {
+      // Initial state
+      tableBody.querySelectorAll('tr.detalle-row').forEach(updatePartialRemoveVisibility);
+
       tableBody.addEventListener('click', function (e) {
         const btn = e.target.closest('button');
         if (!btn) return;
@@ -207,13 +232,26 @@
           if (qty < 0) qty = 0;
         }
 
+        // Clamp to 0 but keep the row (do NOT mark DELETE / hide)
+        if (qty <= 0) {
+          qty = 0;
+        }
+
         qtyInput.value = String(qty);
         if (deleteInput) {
-          deleteInput.checked = (qty <= 0);
-          setRowDeletedState(row, deleteInput.checked);
-        } else {
-          setRowDeletedState(row, qty <= 0);
+          deleteInput.checked = false;
         }
+        setRowDeletedState(row, false);
+        updatePartialRemoveVisibility(row);
+      });
+
+      // If user edits the stock (cantidad_base) manually, hide/show partial remove controls
+      tableBody.addEventListener('input', function (e) {
+        const target = e.target;
+        if (!target) return;
+        if (!target.matches('input[name$="-cantidad_base"]')) return;
+        const row = target.closest('tr.detalle-row');
+        updatePartialRemoveVisibility(row);
       });
 
       tableBody.addEventListener('change', function (e) {
@@ -228,6 +266,8 @@
     if (addBtn) {
       addBtn.addEventListener('click', function() {
         cloneLastRow();
+        const rows = tableBody ? tableBody.querySelectorAll('tr.detalle-row') : [];
+        if (rows.length) updatePartialRemoveVisibility(rows[rows.length - 1]);
       });
     }
   })();

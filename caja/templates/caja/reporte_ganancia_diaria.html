@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load format_numbers %}
+{% block titulo %}Ganancia Diaria (Histórico){% endblock %}
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-graph-up icon-circle icon-circle-lg"></i> Ganancia diaria (histórico)</h2>
+    <a href="{% url 'caja_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
+  </div>
+
+  <form method="get" class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">Desde</label>
+          <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Hasta</label>
+          <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" class="form-control" />
+        </div>
+        <div class="col-md-6 d-flex gap-2">
+          <button class="btn btn-primary rounded-pill shadow btn-new-product" type="submit"><i class="bi bi-search me-2"></i> Filtrar</button>
+          <a class="btn btn-outline-secondary rounded-pill shadow btn-new-product" href="{% url 'reporte_ganancia_diaria' %}"><i class="bi bi-x-circle me-2"></i> Limpiar</a>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="text-muted">Total vendido: <strong>${{ total_vendido_general|format_money }}</strong></div>
+        <div class="text-muted">Ganancia: <strong>${{ ganancia_general|format_money }}</strong></div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Día</th>
+              <th class="text-end">Cajas</th>
+              <th class="text-end">Total vendido</th>
+              <th class="text-end">Ganancia</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                <td>{{ r.fecha }}</td>
+                <td class="text-end">{{ r.cajas }}</td>
+                <td class="text-end">${{ r.total_vendido|format_money }}</td>
+                <td class="text-end">${{ r.ganancia|format_money }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="text-center text-muted py-4">Sin datos para el rango elegido.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

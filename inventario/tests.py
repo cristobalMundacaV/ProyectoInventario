@@ -50,6 +50,70 @@ class ProductoFormDefaultsTests(TestCase):
         p = Producto.objects.get(codigo_barra='G001')
         self.assertEqual(p.unidad_base, 'KG')
 
+    def test_pack_requires_unidades_por_pack_and_unidad_base(self):
+        # Missing unidades_por_pack should fail
+        resp = self.client.post('/inventario/productos/nuevo/', {
+            'codigo_barra': 'P001',
+            'nombre': 'PackTest',
+            'categoria': self.cat.id,
+            'tipo_producto': 'PACK',
+            'unidad_base': 'UNIDAD',
+            'stock_actual_base': '1',
+            'stock_minimo': '1',
+            'precio_compra': '10.00',
+            'precio_venta': '20.00',
+            'activo': 'on'
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Producto.objects.filter(codigo_barra='P001').exists())
+
+        # Missing unidad_base should also fail
+        resp2 = self.client.post('/inventario/productos/nuevo/', {
+            'codigo_barra': 'P002',
+            'nombre': 'PackTest2',
+            'categoria': self.cat.id,
+            'tipo_producto': 'PACK',
+            'unidades_por_pack': '6',
+            'stock_actual_base': '1',
+            'stock_minimo': '1',
+            'precio_compra': '10.00',
+            'precio_venta': '20.00',
+            'activo': 'on'
+        })
+        self.assertEqual(resp2.status_code, 200)
+        self.assertFalse(Producto.objects.filter(codigo_barra='P002').exists())
+
+    def test_granel_requires_kg_por_caja(self):
+        resp = self.client.post('/inventario/productos/nuevo/', {
+            'codigo_barra': 'G002',
+            'nombre': 'GranelTest2',
+            'categoria': self.cat.id,
+            'tipo_producto': 'GRANEL',
+            # missing kg_por_caja
+            'stock_actual_base': '1',
+            'stock_minimo': '1',
+            'precio_compra': '10.00',
+            'precio_venta': '20.00',
+            'activo': 'on'
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Producto.objects.filter(codigo_barra='G002').exists())
+
+    def test_prices_must_be_greater_than_zero(self):
+        resp = self.client.post('/inventario/productos/nuevo/', {
+            'codigo_barra': 'U002',
+            'nombre': 'UnitarioZeroPrice',
+            'categoria': self.cat.id,
+            'tipo_producto': 'UNITARIO',
+            'stock_actual_base': '1',
+            'stock_minimo': '0',
+            'precio_compra': '0',
+            'precio_venta': '0',
+            'activo': 'on'
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Producto.objects.filter(codigo_barra='U002').exists())
+
     def test_unlink_keeps_product_and_unlinks_sales(self):
         # Create product and a sale that references it, then unlink
         from ventas.models import Venta, VentaDetalle

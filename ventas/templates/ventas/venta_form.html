@@ -1,0 +1,580 @@
+{% extends 'base.html' %}
+{% block titulo %}Nueva Venta{% endblock %}
+{% block contenido %}
+<div class="row">
+    <div class="col-12 col-md-10 col-lg-11 mx-auto">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h2 class="fw-bold text-primary"><i class="bi bi-currency-dollar icon-circle icon-circle-lg"></i> Registrar Venta</h2>
+          <!-- espacio para acciones futuras -->
+        </div>
+        <div class="card shadow border-0">
+            <div class="card-body">
+                <!-- Toast container for inline messages (top-right) -->
+                <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080; display:none;" id="ventaToastContainer"></div>
+                <form method="post" id="ventaForm">
+                    {% csrf_token %}
+                    {{ dformset.management_form }}
+
+                    <!-- Scanner de códigos de barras -->
+                    <div class="row mb-3 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold">Escanear Código de Barras</label>
+                            <input type="text" id="barcodeScanner" class="form-control" placeholder="Apunte el lector aquí o escriba el código de barras..." autocomplete="off">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Cantidad</label>
+                            <input type="number" id="defaultQuantity" class="form-control" value="1" step="0.001" min="0.001">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" id="btnAgregarProducto" class="btn btn-success shadow btn-new-product" style="height:50px; font-size:16px;">
+                                <i class="bi bi-plus-circle me-2"></i> Agregar Producto
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de productos -->
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered table-hover" id="productosTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Producto</th>
+                                    <th>Precio Unit.</th>
+                                    <th>Cantidad</th>
+                                    <th>Unidad</th>
+                                    <th>Subtotal</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productosTableBody">
+                                <!-- Los productos se agregarán aquí dinámicamente -->
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <th colspan="5" class="text-end">TOTAL:</th>
+                                            <th id="totalAmount">$0</th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div id="scanMessage" class="alert alert-success mt-2 text-center" style="display:none;"></div>
+
+                    <!-- Campos ocultos para el formset -->
+                    <div id="hiddenFields" style="display:none;">
+                        {% for form in dformset.forms %}
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card de Datos de la Venta -->
+<div class="row" style="margin-top: 25px;">
+    <div class="col-12 col-md-10 col-lg-11 mx-auto">
+        <div class="card shadow border-0">
+            <div class="card-header bg-primary text-white fw-bold">
+                <ib></i> Datos de la Venta
+            </div>
+            <div class="card-body">
+                <form method="post" id="ventaSubmitForm">
+                    {% csrf_token %}
+                    
+                    <!-- Información automática -->
+                    <div class="alert alert-info mb-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Usuario:</strong> {{ usuario_actual.username }}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Caja Activa:</strong> {{ caja_activa.fecha }} 
+                                <span class="badge bg-success">Abierta</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">{{ vform.metodo_pago.label }}{% if vform.metodo_pago.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {{ vform.metodo_pago }}
+                        {% for error in vform.metodo_pago.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="submit" class="btn btn-success shadow btn-new-product"><i class="bi bi-check-circle me-2"></i> Confirmar Venta</button>
+                        <a href="{% url 'venta_list' %}" class="btn btn-secondary btn-new-product"><i class="bi bi-x-circle me-2"></i> Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const productsData = {{ products|safe }};
+    const stockMap = {{ product_stock_map|safe }};
+    
+    let productosAgregados = [];
+    let formCounter = 0;
+
+    // Mapeo de productos por código de barras
+    const productByBarcode = {};
+    productsData.forEach(function(p) {
+        if (p.codigo_barra) productByBarcode[String(p.codigo_barra)] = p;
+    });
+
+    // Formatea números: si decimales son ceros, no los muestra; acepta cantidad de decimales
+    function formatDecimal(q, decimals) {
+        const n = Number(q);
+        if (Number.isNaN(n)) return '';
+        const fixed = n.toFixed(decimals);
+        const num = Number(fixed);
+        return String(num);
+    }
+
+    function formatQuantity(q) {
+        return formatDecimal(q, 3);
+    }
+    function showScanMessage(product, quantity) {
+        const msg = document.getElementById('scanMessage');
+        if (!msg) return;
+        msg.textContent = 'Agregado: ' + product.nombre + ' x ' + formatQuantity(quantity);
+        msg.style.display = 'block';
+        setTimeout(function() { msg.style.display = 'none'; }, 1500);
+    }
+
+    // Función para agregar producto a la tabla
+    function addProductToTable(barcode, quantity) {
+        quantity = quantity || 1;
+        barcode = String(barcode || '').trim();
+        // Lookup ONLY by barcode to avoid accidental matches by internal product id
+        let product = productByBarcode[barcode];
+        if (!product) {
+            showInlineMessage('Producto no encontrado: ' + barcode, 'danger');
+            return false;
+        }
+
+        const normalizedBarcode = String(product.codigo_barra || '').trim();
+        if (!normalizedBarcode) {
+            showInlineMessage('El producto no tiene código de barras configurado.', 'danger');
+            return false;
+        }
+
+        // Verificar stock
+        const availableStock = parseFloat(stockMap[product.id]);
+        if (quantity > availableStock) {
+            showInlineMessage('Stock insuficiente. Disponible: ' + availableStock, 'danger');
+            return false;
+        }
+
+        // Verificar si ya existe en la tabla
+        const existingRow = document.querySelector('tr[data-barcode="' + normalizedBarcode + '"]');
+        if (existingRow) {
+            // Actualizar cantidad si ya existe
+            const qtyCell = existingRow.querySelector('td[data-field="cantidad"]');
+            const currentQty = parseFloat(qtyCell.textContent);
+            const newQty = currentQty + quantity;
+            
+            if (newQty > availableStock) {
+                showInlineMessage('Stock insuficiente. Disponible: ' + availableStock, 'danger');
+                return false;
+            }
+            
+            qtyCell.textContent = formatQuantity(newQty);
+            updateRowSubtotal(existingRow);
+        } else {
+            // Agregar nueva fila
+            const tbody = document.getElementById('productosTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-barcode', normalizedBarcode);
+            row.setAttribute('data-product-id', product.id);
+            
+            const unidadDisplay = getUnidadDisplay(product.tipo_producto);
+            const subtotal = (product.precio_venta * quantity);
+            
+            row.innerHTML = '<td>' + product.codigo_barra + '</td>' +
+                '<td>' + product.nombre + '</td>' +
+                '<td>$' + formatDecimal(product.precio_venta, 0) + '</td>' +
+                '<td data-field="cantidad">' + formatQuantity(quantity) + '</td>' +
+                '<td data-field="unidad">' + unidadDisplay + '</td>' +
+                '<td data-field="subtotal">$' + formatDecimal(subtotal, 0) + '</td>' +
+                    '<td class="d-flex align-items-center justify-content-center gap-2">'
+                        + '<input type="number" min="1" step="1" value="1" class="form-control form-control-sm remove-qty-input" style="width:70px; text-align:center;" title="Cantidad a eliminar">'
+                        + '<button type="button" class="btn btn-sm btn-outline-danger remove-product" style="border-radius: 999px;" title="Eliminar cantidad seleccionada"><i class="bi bi-trash"></i></button>'
+                        + '<button type="button" class="btn btn-sm btn-danger remove-product-all" title="Eliminar todo el producto" '
+                        + 'style="width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;">'
+                        + '<i class="bi bi-x-lg text-white" style="font-size:0.85rem;line-height:1;"></i>'
+                        + '</button>'
+                        + '</td>';
+            
+            tbody.appendChild(row);
+            attachRowEvents(row);
+        }
+        
+        updateTotal();
+        updateHiddenFields();
+        showScanMessage(product, quantity);
+        return true;
+    }
+
+    function getUnidadDisplay(tipoProducto) {
+        switch(tipoProducto) {
+            case 'UNITARIO': return 'UNIDAD';
+            case 'PACK': return 'CAJA';
+            case 'GRANEL': return 'KG';
+            default: return 'UNIDAD';
+        }
+    }
+
+    function updateRowSubtotal(row) {
+        const price = parseFloat(row.cells[2].textContent.replace('$', '')) || 0;
+        const quantity = parseFloat(row.cells[3].textContent) || 0;
+        const subtotal = (price * quantity);
+        row.cells[5].textContent = '$' + formatDecimal(subtotal, 0);
+    }
+
+    function updateTotal() {
+        let total = 0;
+        const rows = document.querySelectorAll('#productosTableBody tr');
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const subtotal = parseFloat(row.cells[5].textContent.replace('$', '')) || 0;
+            total += subtotal;
+        }
+        document.getElementById('totalAmount').textContent = '$' + formatDecimal(total, 0);
+    }
+
+    function attachRowEvents(row) {
+        const removeBtn = row.querySelector('.remove-product');
+        const removeQtyInput = row.querySelector('.remove-qty-input');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                const qtyCell = row.querySelector('td[data-field="cantidad"]');
+                const currentQty = parseFloat(qtyCell.textContent) || 0;
+                const toRemove = removeQtyInput ? (parseFloat(removeQtyInput.value) || 0) : 0;
+
+                if (toRemove > 0) {
+                    const newQty = currentQty - toRemove;
+                    if (newQty > 0) {
+                        qtyCell.textContent = formatQuantity(newQty);
+                        updateRowSubtotal(row);
+                        updateTotal();
+                        updateHiddenFields();
+                        return;
+                    }
+                }
+                // Si no quedó cantidad o toRemove inválido, eliminar la fila
+                row.remove();
+                updateTotal();
+                updateHiddenFields();
+            });
+        }
+
+        if (removeQtyInput) {
+            removeQtyInput.addEventListener('click', function(e) { e.stopPropagation(); });
+            removeQtyInput.addEventListener('keydown', function(e) { e.stopPropagation(); });
+        }
+        const removeAllBtn = row.querySelector('.remove-product-all');
+        if (removeAllBtn) {
+            removeAllBtn.addEventListener('click', function() {
+                row.remove();
+                updateTotal();
+                updateHiddenFields();
+            });
+        }
+    }
+
+    function updateHiddenFields() {
+        const hiddenContainer = document.getElementById('hiddenFields');
+        hiddenContainer.innerHTML = '';
+        
+        const rows = document.querySelectorAll('#productosTableBody tr');
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const productId = row.getAttribute('data-product-id');
+            const barcode = row.getAttribute('data-barcode');
+            const quantity = parseFloat(row.cells[3].textContent);
+            
+            // Crear campos ocultos para el formset
+            const formIndex = i;
+            
+            // Producto
+            const productInput = document.createElement('input');
+            productInput.type = 'hidden';
+            productInput.name = 'form-' + formIndex + '-producto';
+            productInput.value = productId;
+            hiddenContainer.appendChild(productInput);
+            
+            // Unidad venta
+            const unidadInput = document.createElement('input');
+            unidadInput.type = 'hidden';
+            unidadInput.name = 'form-' + formIndex + '-unidad_venta';
+            unidadInput.value = getUnidadDisplay(productByBarcode[barcode].tipo_producto);
+            hiddenContainer.appendChild(unidadInput);
+            
+            // Cantidad
+            const cantidadInput = document.createElement('input');
+            cantidadInput.type = 'hidden';
+            cantidadInput.name = 'form-' + formIndex + '-cantidad_ingresada';
+            cantidadInput.value = quantity;
+            hiddenContainer.appendChild(cantidadInput);
+        }
+        
+        // Actualizar TOTAL_FORMS
+        let totalFormsInput = document.getElementById('id_form-TOTAL_FORMS');
+        if (!totalFormsInput) {
+            const byName = document.getElementsByName('form-TOTAL_FORMS');
+            if (byName && byName.length) totalFormsInput = byName[0];
+        }
+        if (totalFormsInput) {
+            totalFormsInput.value = rows.length;
+        }
+    }
+
+    // Event listener para el scanner (usa endpoint AJAX para validar/obtener producto)
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    const scannerElement = document.getElementById('barcodeScanner');
+    const MIN_QUANTITY = 0.001;
+    function isValidQuantityString(s) {
+        if (s === null || s === undefined) return false;
+        s = String(s).trim();
+        // Only allow digits and optional single decimal point, no signs, no other chars
+        // Examples valid: 1, 1.0, 0.001, 12.5
+        return /^\d+(?:\.\d+)?$/.test(s);
+    }
+    function showInlineMessage(msg, type) {
+        var container = document.getElementById('ventaToastContainer');
+        if (!container) {
+            // create toast container dynamically if missing
+            container = document.createElement('div');
+            container.id = 'ventaToastContainer';
+            container.className = 'toast-container position-fixed top-0 end-0 p-3';
+            container.style.zIndex = '1080';
+            container.style.display = 'block';
+            container.style.top = '0px';
+            container.style.right = '1rem';
+            document.body.appendChild(container);
+        } else {
+            container.style.display = 'block';
+            container.style.top = '0px';
+            container.style.right = '1rem';
+        }
+            // Prevent spam: dedupe identical messages and cap concurrent toasts
+            window.__ventaActiveToasts = window.__ventaActiveToasts || {};
+            window.__ventaToastOrder = window.__ventaToastOrder || [];
+            var MAX_TOASTS = 3;
+            var key = (type || 'info') + '|' + String(msg);
+
+            function removeToastByKey(k) {
+                try {
+                    var entry = window.__ventaActiveToasts[k];
+                    if (entry && entry.element) entry.element.remove();
+                } catch (e) {}
+                try { if (window.__ventaActiveToasts[k] && window.__ventaActiveToasts[k].timeout) clearTimeout(window.__ventaActiveToasts[k].timeout); } catch (e) {}
+                delete window.__ventaActiveToasts[k];
+                var idx = window.__ventaToastOrder.indexOf(k);
+                if (idx !== -1) window.__ventaToastOrder.splice(idx, 1);
+                if (container && !container.children.length) container.style.display = 'none';
+            }
+
+            // If same message already shown, refresh its timer and pulse it
+            if (window.__ventaActiveToasts[key]) {
+                var existing = window.__ventaActiveToasts[key];
+                try {
+                    existing.element.classList.remove('show');
+                    void existing.element.offsetWidth;
+                    existing.element.classList.add('show');
+                } catch (e) {}
+                try { clearTimeout(existing.timeout); } catch (e) {}
+                existing.timeout = setTimeout(function() { removeToastByKey(key); }, 3500);
+                return;
+            }
+
+            // If too many toasts, remove oldest
+            if (window.__ventaToastOrder.length >= MAX_TOASTS) {
+                var oldest = window.__ventaToastOrder.shift();
+                removeToastByKey(oldest);
+            }
+
+            var level = 'info';
+            if (type === 'danger' || type === 'error') level = 'danger';
+            if (type === 'warning') level = 'warning';
+            if (type === 'success') level = 'success';
+            var toast = document.createElement('div');
+            toast.className = 'toast align-items-center text-bg-' + level + ' border-0 show mb-2';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            toast.innerHTML = '<div class="d-flex"><div class="toast-body">' + String(msg) + '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
+            container.appendChild(toast);
+
+            var timeoutId = setTimeout(function() { removeToastByKey(key); }, 3500);
+            window.__ventaActiveToasts[key] = { element: toast, timeout: timeoutId };
+            window.__ventaToastOrder.push(key);
+
+            try {
+                var bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+                bsToast.show();
+            } catch (e) {}
+    }
+    if (scannerElement) {
+        scannerElement.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const barcode = this.value.trim();
+                const rawQ = document.getElementById('defaultQuantity').value;
+                if (!isValidQuantityString(rawQ)) {
+                    showInlineMessage('Cantidad inválida. Use sólo números y un punto decimal (ej. 1 o 0.5).', 'danger');
+                    document.getElementById('defaultQuantity').value = '1';
+                    scannerElement.focus();
+                    return;
+                }
+                let quantity = parseFloat(rawQ);
+                if (isNaN(quantity) || quantity < MIN_QUANTITY) {
+                    showInlineMessage('Cantidad inválida. Debe ser mayor que 0.', 'danger');
+                    document.getElementById('defaultQuantity').value = '1';
+                    scannerElement.focus();
+                    return;
+                }
+
+                if (!barcode) return;
+
+                fetch('{% url "agregar_producto_ajax" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify({ codigo: barcode, cantidad: quantity })
+                }).then(function(res) {
+                    return res.json();
+                }).then(function(data) {
+                    if (data && data.ok) {
+                        const p = data.producto;
+                        if (!p.codigo_barra) {
+                            showInlineMessage('El producto no tiene código de barras configurado.', 'danger');
+                            return;
+                        }
+                        // Asegurar que esté en el mapa local para poder usar addProductToTable
+                        if (!productByBarcode[String(p.codigo_barra)]) {
+                            productByBarcode[String(p.codigo_barra)] = p;
+                        }
+                        stockMap[String(p.id)] = String(p.stock_actual_base || 0);
+
+                        if (addProductToTable(String(p.codigo_barra), quantity)) {
+                            scannerElement.value = '';
+                            document.getElementById('defaultQuantity').value = '1';
+                            scannerElement.focus();
+                        }
+                    } else {
+                        showInlineMessage(data && data.error ? data.error : 'Producto no encontrado', 'danger');
+                    }
+                }).catch(function(err) {
+                    console.error(err);
+                    showInlineMessage('Error al consultar el producto', 'danger');
+                });
+            }
+        });
+    }
+
+    // Click handler para el botón Agregar Producto
+    const btnAgregar = document.getElementById('btnAgregarProducto');
+    if (btnAgregar) {
+        btnAgregar.addEventListener('click', function(e) {
+            e.preventDefault();
+            const barcodeInput = document.getElementById('barcodeScanner');
+            const barcode = barcodeInput ? barcodeInput.value.trim() : '';
+            const rawQ = document.getElementById('defaultQuantity').value;
+            if (!isValidQuantityString(rawQ)) {
+                showInlineMessage('Cantidad inválida. Use sólo números y un punto decimal (ej. 1 o 0.5).', 'danger');
+                document.getElementById('defaultQuantity').value = '1';
+                return;
+            }
+            let quantity = parseFloat(rawQ);
+            if (isNaN(quantity) || quantity < MIN_QUANTITY) {
+                showInlineMessage('Cantidad inválida. Debe ser mayor que 0.', 'danger');
+                document.getElementById('defaultQuantity').value = '1';
+                return;
+            }
+
+            if (!barcode) {
+                showInlineMessage('Ingrese el código de barras o escanee un producto.', 'warning');
+                if (barcodeInput) barcodeInput.focus();
+                return;
+            }
+
+            if (addProductToTable(barcode, quantity)) {
+                if (barcodeInput) barcodeInput.value = '';
+                document.getElementById('defaultQuantity').value = '1';
+                if (barcodeInput) barcodeInput.focus();
+            }
+        });
+    }
+
+    // Prevenir envío del formulario con Enter
+    const formElement = document.getElementById('ventaForm');
+    if (formElement) {
+        formElement.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.id !== 'barcodeScanner') {
+                e.preventDefault();
+            }
+        });
+    }
+
+    // Ensure hidden formset data and management inputs are submitted with the venta submit form
+    const ventaSubmitForm = document.getElementById('ventaSubmitForm');
+    if (ventaSubmitForm) {
+        ventaSubmitForm.addEventListener('submit', function(e) {
+            // Rebuild hidden fields so TOTAL_FORMS is correct
+            updateHiddenFields();
+            const hiddenContainer = document.getElementById('hiddenFields');
+
+            // Copy management inputs (TOTAL_FORMS, INITIAL_FORMS, MAX_NUM_FORMS) into the submit form
+            // Try by id first, then fallback to name-based lookup for robustness
+            ['form-TOTAL_FORMS','form-INITIAL_FORMS','form-MAX_NUM_FORMS'].forEach(function(name) {
+                let elem = document.getElementById('id_' + name);
+                if (!elem) {
+                    const byName = document.getElementsByName(name);
+                    if (byName && byName.length) elem = byName[0];
+                }
+                if (elem) {
+                    // avoid duplicating if already present
+                    const existing = ventaSubmitForm.querySelector('[name="' + name + '"]');
+                    if (!existing) {
+                        ventaSubmitForm.appendChild(elem.cloneNode(true));
+                    }
+                }
+            });
+
+            // Copy per-line hidden inputs into the submit form
+            if (hiddenContainer) {
+                Array.from(hiddenContainer.children).forEach(function(child) {
+                    ventaSubmitForm.appendChild(child.cloneNode(true));
+                });
+            }
+            // Let the form submit normally
+        });
+    }
+});
+</script>
+
+{% endblock %}

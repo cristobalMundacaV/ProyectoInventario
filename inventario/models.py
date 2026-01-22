@@ -1,5 +1,9 @@
 from django.db import models
+from django.db.models import Case, DecimalField, ExpressionWrapper, F, When
 from django.utils import timezone
+
+
+_STOCK_DECIMAL_FIELD = DecimalField(max_digits=10, decimal_places=3)
 
 
 class Categoria(models.Model):
@@ -71,6 +75,35 @@ class Producto(models.Model):
             return int(self.stock_actual_base) * int(self.unidades_por_pack)
         return int(self.stock_actual_base)
 
+    def stock_actual_para_alerta(self):
+        """Stock actual en la misma unidad que se compara con el mínimo.
+
+        Para PACK vendidos por UNIDAD, el stock se muestra en unidades (packs * unidades_por_pack),
+        y el mínimo se interpreta en unidades; por lo tanto la comparación debe hacerse en unidades.
+        """
+        try:
+            if self.tipo_producto == 'PACK' and self.unidad_base == 'UNIDAD' and self.unidades_por_pack:
+                return (self.stock_actual_base or 0) * int(self.unidades_por_pack)
+            return self.stock_actual_base or 0
+        except Exception:
+            return self.stock_actual_base or 0
+
+    def stock_minimo_para_alerta(self):
+        """Stock mínimo en la unidad de comparación.
+
+        En la UI, para PACK con unidad_base=UNIDAD el mínimo se ingresa/visualiza en unidades,
+        por lo que no se convierte.
+        """
+        return self.stock_minimo or 0
+
+    def is_stock_bajo(self):
+        try:
+            if (self.stock_minimo or 0) <= 0:
+                return False
+            return (self.stock_actual_para_alerta() or 0) <= (self.stock_minimo_para_alerta() or 0)
+        except Exception:
+            return False
+
     @property
     def stock_minimo_display(self):
         if self.tipo_producto == 'GRANEL':
@@ -87,13 +120,18 @@ class Producto(models.Model):
     def margen_display(self):
         if self.tipo_producto == 'PACK' and self.unidades_por_pack:
             try:
-                return str(round(float(self.precio_venta) - float(self.precio_unitario_pack), 2))
+                # Si el pack se vende por UNIDAD, el margen es por unidad.
+                # Si el pack se vende por PACK, el margen es por pack.
+                if self.unidad_base == 'PACK':
+                    return str(round(float(self.precio_venta) - float(self.precio_compra), 2))
+                # Nota: para PACK vendido por UNIDAD, precio_compra se guarda como costo por unidad.
+                return str(round(float(self.precio_venta) - float(self.precio_compra), 2))
             except (ZeroDivisionError, TypeError):
                 return ""
         elif self.tipo_producto == 'GRANEL' and self.kg_por_caja:
             try:
-                # MARGEN POR KG: precio_venta - (precio_compra / kg_por_caja)
-                return str(round(float(self.precio_venta) - (float(self.precio_compra) / float(self.kg_por_caja)), 2))
+                # Nota: para GRANEL, precio_compra se guarda como costo por KG.
+                return str(round(float(self.precio_venta) - float(self.precio_compra), 2))
             except (ZeroDivisionError, TypeError):
                 return ""
         else:
@@ -103,6 +141,10 @@ class Producto(models.Model):
     def precio_unitario_pack(self):
         if self.tipo_producto == 'PACK' and self.unidades_por_pack:
             try:
+                # Si unidad_base=UNIDAD, ya guardamos el costo unitario en precio_compra.
+                if self.unidad_base == 'UNIDAD':
+                    return round(float(self.precio_compra), 2)
+                # Si unidad_base=PACK, devolvemos un costo unitario de referencia.
                 return round(float(self.precio_compra) / self.unidades_por_pack, 2)
             except (ZeroDivisionError, TypeError):
                 return 0
@@ -128,12 +170,18 @@ class Producto(models.Model):
         # Ajuste y cálculo de margen
         if self.tipo_producto == 'PACK' and self.unidades_por_pack:
             try:
-                self.margen_ganancia = round(float(self.precio_venta) - (float(self.precio_compra) / self.unidades_por_pack), 2)
+                if self.unidad_base == 'PACK':
+                    # Margen por pack (precio_venta por pack - costo del pack)
+                    self.margen_ganancia = round(float(self.precio_venta) - float(self.precio_compra), 2)
+                else:
+                    # Para venta por UNIDAD, guardamos precio_compra como costo por unidad.
+                    self.margen_ganancia = round(float(self.precio_venta) - float(self.precio_compra), 2)
             except (ZeroDivisionError, TypeError):
                 self.margen_ganancia = 0
         elif self.tipo_producto == 'GRANEL' and self.kg_por_caja:
             try:
-                self.margen_ganancia = round(float(self.precio_venta) - (float(self.precio_compra) / float(self.kg_por_caja)), 2)
+                # Para GRANEL, guardamos precio_compra como costo por KG.
+                self.margen_ganancia = round(float(self.precio_venta) - float(self.precio_compra), 2)
             except (ZeroDivisionError, TypeError):
                 self.margen_ganancia = 0
         else:
@@ -188,3 +236,34 @@ class IngresoStockDetalle(models.Model):
 
     def __str__(self):
         return f"{self.producto} +{self.cantidad_base}"
+
+
+def annotate_stock_actual_alerta(qs):
+    """Anota `stock_actual_alerta` para filtrar bajo-stock en DB.
+
+    Regla especial: PACK con unidad_base=UNIDAD compara en unidades (packs * unidades_por_pack).
+    """
+    if qs is None:
+        qs = Producto.objects.all()
+
+    stock_actual_alerta = Case(
+        When(
+            tipo_producto='PACK',
+            unidad_base='UNIDAD',
+            unidades_por_pack__gt=0,
+            then=ExpressionWrapper(
+                F('stock_actual_base') * F('unidades_por_pack'),
+                output_field=_STOCK_DECIMAL_FIELD,
+            ),
+        ),
+        default=F('stock_actual_base'),
+        output_field=_STOCK_DECIMAL_FIELD,
+    )
+
+    return qs.annotate(stock_actual_alerta=stock_actual_alerta)
+
+
+def bajo_stock_queryset(qs=None):
+    """Devuelve un queryset con productos en bajo stock con reglas consistentes."""
+    qs = annotate_stock_actual_alerta(qs)
+    return qs.filter(stock_minimo__gt=0).filter(stock_actual_alerta__lte=F('stock_minimo'))

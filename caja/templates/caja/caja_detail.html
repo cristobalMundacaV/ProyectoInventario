@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load format_numbers tz %}
+
+{% block title %}Detalle de Caja{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Caja del {{ caja.fecha|date:"d/m/Y" }} - {% if caja.abierta %}<span class="badge bg-success">Abierta</span>{% else %}<span class="badge bg-danger">Cerrada</span>{% endif %}</h4>
+            <div class="d-flex gap-2">
+                {% if not caja.abierta %}
+                <a href="{% url 'caja_boleta' caja.id %}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">🖨️ Imprimir boleta</a>
+                {% endif %}
+                <a href="{% url 'caja_list' %}" class="btn btn-secondary btn-sm">← Volver</a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-3"><strong>Monto Inicial:</strong> ${{ caja.monto_inicial|format_decimal:2 }}</div>
+                <div class="col-md-3"><strong>Total Vendido:</strong> ${{ caja.total_vendido|format_decimal:2 }}</div>
+                <div class="col-md-3"><strong>Efectivo:</strong> ${{ caja.total_efectivo|format_decimal:2 }}</div>
+                <div class="col-md-3"><strong>Débito:</strong> ${{ caja.total_debito|format_decimal:2 }}</div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-3"><strong>Transferencia:</strong> ${{ caja.total_transferencia|format_decimal:2 }}</div>
+                <div class="col-md-3"><strong>Ganancia:</strong> ${{ caja.ganancia_diaria|format_decimal:2 }}</div>
+                <div class="col-md-3"><strong>Hora apertura:</strong> {{ caja.hora_apertura|localtime|date:"H:i" }}</div>
+                <div class="col-md-3"><strong>Hora cierre:</strong> {{ caja.hora_cierre|localtime|date:"H:i" }}</div>
+            </div>
+
+            <h5 class="mt-4">Ventas ({{ ventas.count }})</h5>
+            {% if ventas %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Fecha</th>
+                            <th>Usuario</th>
+                            <th>Método</th>
+                            <th>Total</th>
+                            <th>Detalles</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in ventas %}
+                        <tr>
+                            <td>{{ v.id }}</td>
+                            <td>{{ v.fecha|localtime|date:"d/m/Y H:i" }}</td>
+                            <td>{{ v.usuario.username }}</td>
+                            <td>{{ v.get_metodo_pago_display }}</td>
+                            <td>${{ v.total|format_decimal:2 }}</td>
+                            <td>
+                                <ul class="mb-0">
+                                    {% for d in v.detalles.all %}
+                                    <li>{{ d.producto }} — {{ d.cantidad_ingresada|format_decimal:3 }} {{ d.unidad_venta }} — ${{ d.subtotal|format_decimal:2 }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">No hay ventas registradas en esta caja.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

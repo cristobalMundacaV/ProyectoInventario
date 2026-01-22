@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% load format_numbers %}
+
+{% block titulo %}Fiados{% endblock %}
+
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-journal-text icon-circle icon-circle-lg"></i> Fiados</h2>
+    <div class="d-flex gap-2">
+      <a href="{% url 'fiado_create' %}" class="btn btn-success rounded-pill shadow btn-new-product"><i class="bi bi-plus-circle me-2"></i> Nuevo Fiado</a>
+      <a href="{% url 'venta_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
+    </div>
+  </div>
+
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-5">
+      <label class="form-label mb-1">Cliente</label>
+      <input type="text" name="q" value="{{ filtros.q }}" class="form-control" placeholder="Buscar por nombre...">
+    </div>
+    <div class="col-md-5">
+      <label class="form-label mb-1">Estado</label>
+      <select name="estado" class="form-select">
+        <option value="" {% if not filtros.estado %}selected{% endif %}>Todos</option>
+        {% for val,label in estado_choices %}
+          <option value="{{ val }}" {% if filtros.estado == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button type="submit" class="btn btn-primary btn-match-input">Filtrar</button>
+    </div>
+  </form>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th class="text-end">Total</th>
+            <th class="text-end">Saldo</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in fiados %}
+            <tr>
+              <td>{{ f.id }}</td>
+              <td>{{ f.fecha|date:"Y-m-d H:i" }}</td>
+              <td class="fw-semibold">{{ f.cliente_nombre }}</td>
+              <td class="text-end">${{ f.total|format_money }}</td>
+              <td class="text-end">${{ f.saldo|format_money }}</td>
+              <td>
+                {% if f.estado == 'ABIERTO' %}
+                  <span class="badge bg-warning text-dark">Abierto</span>
+                {% elif f.estado == 'PAGADO' %}
+                  <span class="badge bg-success">Pagado</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ f.estado }}</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <a href="{% url 'fiado_detail' f.id %}" class="btn btn-outline-primary btn-sm rounded-pill"><i class="bi bi-eye me-1"></i> Ver</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No hay fiados registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Paginación -->
+  {% if fiados.has_other_pages %}
+  <nav aria-label="Pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
+      {% if fiados.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1{% if filtros.q %}&q={{ filtros.q }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}" aria-label="Primera página">
+            <i class="bi bi-chevron-bar-left"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ fiados.previous_page_number }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-bar-left"></i></span>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+        </li>
+      {% endif %}
+
+      {% for num in fiados.paginator.page_range %}
+        {% if fiados.number == num %}
+          <li class="page-item active">
+            <span class="page-link">{{ num }} <span class="visually-hidden">(actual)</span></span>
+          </li>
+        {% elif num > fiados.number|add:'-3' and num < fiados.number|add:'3' %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ num }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}">{{ num }}</a>
+          </li>
+        {% elif num == 1 or num == fiados.paginator.num_pages %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ num }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}">{{ num }}</a>
+          </li>
+        {% elif num == fiados.number|add:'-4' or num == fiados.number|add:'4' %}
+          <li class="page-item disabled">
+            <span class="page-link">...</span>
+          </li>
+        {% endif %}
+      {% endfor %}
+
+      {% if fiados.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ fiados.next_page_number }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ fiados.paginator.num_pages }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}" aria-label="Última página">
+            <i class="bi bi-chevron-bar-right"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-bar-right"></i></span>
+        </li>
+      {% endif %}
+    </ul>
+    <div class="text-center text-muted small mt-2">
+      Página {{ fiados.number }} de {{ fiados.paginator.num_pages }} ({{ fiados.paginator.count }} registros totales)
+    </div>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

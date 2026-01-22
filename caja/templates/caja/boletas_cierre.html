@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}Boletas de Cierre{% endblock %}
+
+{% block contenido %}
+<div class="container mt-4">
+  <div class="card shadow border-0">
+    <div class="card-header bg-primary text-white">
+      <h4 class="mb-0">Boletas de cierre</h4>
+    </div>
+    <div class="card-body">
+      <p class="text-muted mb-3">Se cerraron varias cajas. Imprimí la boleta de cada una:</p>
+
+      <div class="list-group">
+        {% for caja in cajas %}
+          <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+             href="{% url 'caja_boleta' caja.id %}?autoprint=1" target="_blank" rel="noopener">
+            <div>
+              <div class="fw-semibold">Caja #{{ caja.id }} — {{ caja.fecha|date:"d/m/Y" }}</div>
+              <small class="text-muted">Apertura: {{ caja.hora_apertura|date:"H:i" }}{% if caja.hora_cierre %} · Cierre: {{ caja.hora_cierre|date:"H:i" }}{% endif %}</small>
+            </div>
+            <span class="badge bg-secondary">Imprimir</span>
+          </a>
+        {% empty %}
+          <div class="list-group-item">No hay cajas para imprimir.</div>
+        {% endfor %}
+      </div>
+
+      <div class="d-flex justify-content-end mt-3">
+        {% if next %}
+          <a class="btn btn-secondary" href="{{ next }}">Volver</a>
+        {% else %}
+          <a class="btn btn-secondary" href="{% url 'caja_list' %}">Volver</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

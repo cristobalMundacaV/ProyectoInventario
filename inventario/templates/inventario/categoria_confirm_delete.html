@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load roles %}
 {% block titulo %}Eliminar Categoría{% endblock %}
 {% block contenido %}
 <div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
@@ -13,7 +14,14 @@
           <p>Esta categoría está referenciada por productos y no puede eliminarse:</p>
           <ul>
             {% for p in related_products %}
-              <li><a href="{% url 'producto_update' p.id %}">{{ p.nombre }}</a> — {{ p.stock_actual_base }} {{ p.unidad_base }}</li>
+              <li>
+                {% if request.user|user_is_admin %}
+                  <a href="{% url 'producto_update' p.id %}">{{ p.nombre }}</a>
+                {% else %}
+                  {{ p.nombre }}
+                {% endif %}
+                — {{ p.stock_actual_base }} {{ p.unidad_base }}
+              </li>
             {% empty %}
               <li>No hay productos relacionados visibles.</li>
             {% endfor %}

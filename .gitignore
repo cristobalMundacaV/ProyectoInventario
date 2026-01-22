@@ -6,9 +6,26 @@ __pycache__/
 
 # Django
 db.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
 *.log
 
 # Entornos
 .env
 .venv/
 venv/
+
+# Editor/tooling
+.vscode/
+.idea/
+.pytest_cache/
+.ruff_cache/
+
+# Build/packaging artifacts
+build/
+dist/
+staticfiles/
+
+# Local test outputs / logs produced by scripts
+test_output*

@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% load format_numbers tz %}
+{% block titulo %}Ventas{% endblock %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-primary d-flex align-items-center">
+        <i class="bi bi-currency-dollar me-3 d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle" style="width:40px;height:40px;font-size:20px;"></i>
+        Ventas
+    </h2>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" id="btnFilter" class="btn btn-outline-primary btn-new-product"><i class="bi bi-funnel-fill me-1"></i> Filtrar</button>
+            <a href="{% url 'venta_list' %}" class="btn rounded-pill shadow btn-new-product btn-outline-secondary" title="Quitar filtros"><i class="bi bi-x-circle me-1"></i> Limpiar filtros</a>
+            <a href="{% url 'ventas_reporte_por_dia' %}" class="btn btn-outline-primary rounded-pill shadow btn-new-product" title="Reporte por día"><i class="bi bi-calendar3 me-1"></i> Por día</a>
+            <a href="{% url 'ventas_reporte_por_metodo' %}" class="btn btn-outline-primary rounded-pill shadow btn-new-product" title="Reporte por método"><i class="bi bi-credit-card me-1"></i> Por método</a>
+            <a href="{% url 'venta_create' %}" class="btn btn-success shadow btn-new-product"><i class="bi bi-plus-circle"></i> Nueva Venta</a>
+        </div>
+</div>
+<!-- Filtros: fecha desde/hasta, método y usuario -->
+<form id="filterForm" method="get" class="mb-4">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label mb-1">Desde</label>
+            <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label mb-1">Hasta</label>
+            <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label mb-1">Método</label>
+            <select name="metodo" class="form-control">
+                <option value="">Todos</option>
+                {% for val,label in metodo_choices %}
+                    <option value="{{ val }}" {% if filtros.metodo == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label mb-1">Usuario</label>
+            <select name="usuario" class="form-control">
+                <option value="">Todos</option>
+                {% for u in usuarios %}
+                    <option value="{{ u.id }}" {% if filtros.usuario|default_if_none:'' == u.id|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</form>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    var btn = document.getElementById('btnFilter');
+    if(btn){
+        btn.addEventListener('click', function(){
+            var f = document.getElementById('filterForm');
+            if(f) f.submit();
+        });
+    }
+});
+</script>
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                        <tr>
+                                              <th class="text-center">ID</th>
+                                            <th>Fecha</th>
+                                            <th>Total</th>
+                                            <th>Método</th>
+                                            <th>Usuario</th>
+                                            <th>Caja</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                </thead>
+                <tbody>
+                    {% for venta in ventas %}
+                    <tr id="venta-{{ venta.id }}">
+                                              <td class="text-center">{{ venta.id }}</td>
+                      <td>{{ venta.fecha|localtime|date:"d/m/Y H:i" }}</td>
+                      <td>${{ venta.total|format_money }}</td>
+                      <td>{{ venta.get_metodo_pago_display }}</td>
+                      <td>{{ venta.usuario }}</td>
+                                            <td>
+                                                {% if venta.caja %}
+                                                    {{ venta.caja.fecha|date:"d/m/Y" }} - {{ venta.caja.hora_apertura|localtime|date:"H:i" }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'venta_detail' venta.id %}" class="btn btn-sm btn-outline-primary">Ver</a>
+                                                <a href="{% url 'venta_comprobante' venta.id %}" target="_blank" class="btn btn-sm btn-outline-secondary">Boleta</a>
+                                            </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center text-muted">No hay ventas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Paginación -->
+{% if ventas.has_other_pages %}
+<nav aria-label="Pagination" class="mt-4">
+  <ul class="pagination justify-content-center">
+    {% if ventas.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page=1{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.metodo %}&metodo={{ filtros.metodo }}{% endif %}{% if filtros.usuario %}&usuario={{ filtros.usuario }}{% endif %}" aria-label="Primera página">
+          <i class="bi bi-chevron-bar-left"></i>
+        </a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="?page={{ ventas.previous_page_number }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.metodo %}&metodo={{ filtros.metodo }}{% endif %}{% if filtros.usuario %}&usuario={{ filtros.usuario }}{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-bar-left"></i></span>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+      </li>
+    {% endif %}
+
+    {% for num in ventas.paginator.page_range %}
+      {% if ventas.number == num %}
+        <li class="page-item active">
+          <span class="page-link">{{ num }} <span class="visually-hidden">(actual)</span></span>
+        </li>
+      {% elif num > ventas.number|add:'-3' and num < ventas.number|add:'3' %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.metodo %}&metodo={{ filtros.metodo }}{% endif %}{% if filtros.usuario %}&usuario={{ filtros.usuario }}{% endif %}">{{ num }}</a>
+        </li>
+      {% elif num == 1 or num == ventas.paginator.num_pages %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.metodo %}&metodo={{ filtros.metodo }}{% endif %}{% if filtros.usuario %}&usuario={{ filtros.usuario }}{% endif %}">{{ num }}</a>
+        </li>
+      {% elif num == ventas.number|add:'-4' or num == ventas.number|add:'4' %}
+        <li class="page-item disabled">
+          <span class="page-link">...</span>
+        </li>
+      {% endif %}
+    {% endfor %}
+
+    {% if ventas.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ ventas.next_page_number }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.metodo %}&metodo={{ filtros.metodo }}{% endif %}{% if filtros.usuario %}&usuario={{ filtros.usuario }}{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="?page={{ ventas.paginator.num_pages }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.metodo %}&metodo={{ filtros.metodo }}{% endif %}{% if filtros.usuario %}&usuario={{ filtros.usuario }}{% endif %}" aria-label="Última página">
+          <i class="bi bi-chevron-bar-right"></i>
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-bar-right"></i></span>
+      </li>
+    {% endif %}
+  </ul>
+  <div class="text-center text-muted small mt-2">
+    Página {{ ventas.number }} de {{ ventas.paginator.num_pages }} ({{ ventas.paginator.count }} registros totales)
+  </div>
+</nav>
+{% endif %}
+{% endblock %}

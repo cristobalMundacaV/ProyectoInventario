@@ -9,6 +9,7 @@ from auditoria.models import Actividad
 from django.db.models import Q
 from django.utils import timezone
 from django.db.models import Count, Sum
+from inventario.models import bajo_stock_queryset
 
 @login_required
 def home(request):
@@ -25,8 +26,8 @@ def home(request):
         # No hay caja abierta: mostrar total 0 (reiniciar total mostrado)
         total_ventas = 0
  
-    # Productos con stock bajo
-    productos_stock_bajo = Producto.objects.filter(stock_minimo__gt=0).count()
+    # Productos con stock bajo (lógica unificada)
+    productos_stock_bajo = bajo_stock_queryset(Producto.objects.all()).count()
  
     # Estado de caja
     cajas_abiertas_count = Caja.objects.filter(abierta=True).count()

@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import Actividad
 from ventas.models import Venta
 from django.db.models import Sum
@@ -16,6 +17,7 @@ from core.authz import admin_required
 def auditoria_list(request):
     """List activities. If ?ventas_mes=1 is provided, show ventas of current month and total."""
     show_ventas_mes = request.GET.get('ventas_mes') in ('1', 'true', 'yes')
+    page = request.GET.get('page', 1)
     context = {}
     if show_ventas_mes:
         now = timezone.now()
@@ -40,8 +42,18 @@ def auditoria_list(request):
                 | Q(descripcion__startswith='Creado IngresoStock')
             )
         )
-        .order_by('-fecha_hora')[:100]
+        .order_by('-fecha_hora')
     )
+    
+    # Paginación
+    paginator = Paginator(actividades, 50)  # 50 por página
+    try:
+        actividades = paginator.page(page)
+    except PageNotAnInteger:
+        actividades = paginator.page(1)
+    except EmptyPage:
+        actividades = paginator.page(paginator.num_pages)
+    
     context['actividades'] = actividades
     return render(request, 'auditoria/auditoria_list.html', context)
 

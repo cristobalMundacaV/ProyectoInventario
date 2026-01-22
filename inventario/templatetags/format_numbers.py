@@ -110,3 +110,44 @@ def strip_decimals_in_text(value):
 
     result = re.sub(r"\b\d+\b", _int_repl, result)
     return result
+
+
+@register.filter
+def format_numbers_in_text(value):
+    """Format numbers in text with thousands separator (dot).
+    
+    Takes a text like 'Venta 5000 total $15420 (EFECTIVO)' and formats it to
+    'Venta 5.000 total $15.420 (EFECTIVO)'.
+    
+    Handles numbers of any length and adds dots every 3 digits from the right.
+    """
+    if value is None:
+        return ''
+    s = str(value)
+
+    def _format_int(num_str: str) -> str:
+        try:
+            return f"{int(num_str):,}".replace(',', '.')
+        except Exception:
+            return num_str
+
+    # 1) Preserve/normalize numbers that already use dot-thousands (e.g., 9.025)
+    def _grouped_repl(match):
+        grouped = match.group(0)
+        # Remove dots, format back with grouping to ensure consistency
+        return _format_int(grouped.replace('.', ''))
+
+    # Avoid touching decimals like 10.25; only match dot-separated thousands groups
+    grouped_pattern = r"\b\d{1,3}(?:\.\d{3})+\b"
+    result = re.sub(grouped_pattern, _grouped_repl, s)
+
+    # 2) Plain integers without separators -> add grouping
+    # Skip numbers that are adjacent to a dot to avoid breaking decimals (e.g., 10.25)
+    def _plain_repl(match):
+        num_str = match.group(0)
+        return _format_int(num_str)
+
+    plain_int_pattern = r"(?<![\d\.])\d+(?![\d\.])"
+    result = re.sub(plain_int_pattern, _plain_repl, result)
+    return result
+

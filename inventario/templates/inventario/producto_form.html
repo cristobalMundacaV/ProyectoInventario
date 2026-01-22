@@ -8,8 +8,9 @@
             <!-- acciones futuras -->
         </div>
         <div class="card-body">
-            <form method="post" autocomplete="off" id="productoForm">
+            <form method="post" autocomplete="off" id="productoForm" novalidate>
                     {% csrf_token %}
+
                     <div class="row">
                         <div class="col-md-7">
                             {% for field in form %}
@@ -17,34 +18,42 @@
                                     <div class="mb-3" id="field-unidad_base" style="display:none;">
                                         <label class="form-label fw-semibold">Unidad de venta <span class="text-danger">*</span></label>
                                         {{ field }}
-                                        {% for error in field.errors %}
-                                            <div class="text-danger small">{{ error }}</div>
-                                        {% endfor %}
+                                        {% if field.errors %}
+                                            <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                                                {% for error in field.errors %}<div>{{ error }}</div>{% endfor %}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 {% elif field.name == 'precio_compra' %}
                                     <div class="mb-3">
                                         <label class="form-label fw-semibold">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
                                         {{ field }}
                                         {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                                        {% for error in field.errors %}
-                                            <div class="text-danger small">{{ error }}</div>
-                                        {% endfor %}
+                                        {% if field.errors %}
+                                            <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                                                {% for error in field.errors %}<div>{{ error }}</div>{% endfor %}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                     <div class="mb-3" id="field-unidades_por_pack" style="display:none;">
                                         <label class="form-label fw-semibold">{{ form.unidades_por_pack.label }}{% if form.unidades_por_pack.field.required %} <span class="text-danger">*</span>{% endif %}</label>
                                         {{ form.unidades_por_pack }}
                                         {% if form.unidades_por_pack.help_text %}<div class="form-text">{{ form.unidades_por_pack.help_text }}</div>{% endif %}
-                                        {% for error in form.unidades_por_pack.errors %}
-                                            <div class="text-danger small">{{ error }}</div>
-                                        {% endfor %}
+                                        {% if form.unidades_por_pack.errors %}
+                                            <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                                                {% for error in form.unidades_por_pack.errors %}<div>{{ error }}</div>{% endfor %}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                     <div class="mb-3" id="field-kg_por_caja" style="display:none;">
                                         <label class="form-label fw-semibold">{{ form.kg_por_caja.label }}{% if form.kg_por_caja.field.required %} <span class="text-danger">*</span>{% endif %}</label>
                                         {{ form.kg_por_caja }}
                                         {% if form.kg_por_caja.help_text %}<div class="form-text">{{ form.kg_por_caja.help_text }}</div>{% endif %}
-                                        {% for error in form.kg_por_caja.errors %}
-                                            <div class="text-danger small">{{ error }}</div>
-                                        {% endfor %}
+                                        {% if form.kg_por_caja.errors %}
+                                            <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                                                {% for error in form.kg_por_caja.errors %}<div>{{ error }}</div>{% endfor %}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 {% elif field.name == 'precio_venta' %}
                                     {# Lo movemos al final, después del margen y antes de activo #}
@@ -58,9 +67,11 @@
                                         {# Render field normally. Widget attributes (step/value) are handled in the view. #}
                                         {{ field }}
                                         {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                                        {% for error in field.errors %}
-                                            <div class="text-danger small">{{ error }}</div>
-                                        {% endfor %}
+                                        {% if field.errors %}
+                                            <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                                                {% for error in field.errors %}<div>{{ error }}</div>{% endfor %}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 {% endif %}
                             {% endfor %}
@@ -69,14 +80,16 @@
                                 <label class="form-label fw-semibold">{{ form.precio_venta.label }}{% if form.precio_venta.field.required %} <span class="text-danger">*</span>{% endif %}</label>
                                 {{ form.precio_venta }}
                                 {% if form.precio_venta.help_text %}<div class="form-text">{{ form.precio_venta.help_text }}</div>{% endif %}
-                                {% for error in form.precio_venta.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
+                                {% if form.precio_venta.errors %}
+                                    <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                                        {% for error in form.precio_venta.errors %}<div>{{ error }}</div>{% endfor %}
+                                    </div>
+                                {% endif %}
                             </div>
                             {% endif %}
 
                             <div class="d-flex justify-content-center gap-2 mt-3">
-                                <button type="submit" class="btn btn-success shadow btn-new-product"><i class="bi bi-check-circle"></i> Guardar</button>
+                                <button type="submit" class="btn btn-success shadow btn-new-product" formnovalidate><i class="bi bi-check-circle"></i> Guardar</button>
                                 <a href="{% url 'producto_list' %}" class="btn btn-secondary btn-new-product"><i class="bi bi-x-circle"></i> Cancelar</a>
                             </div>
                             {# El campo 'activo' se gestiona automáticamente según stock_base; no mostrar en el formulario #}
@@ -92,7 +105,7 @@
                         </div>
                         <div class="col-md-5">
                             <div class="mb-3" id="precio-unitario-pack-container" style="display:none;">
-                                <label class="form-label fw-semibold">Precio unitario por pack:</label>
+                                <label class="form-label fw-semibold" id="precio-unitario-pack-label">Precio unitario por pack:</label>
                                 <div id="precio-unitario-pack" class="form-control bg-light text-center"></div>
                             </div>
                             <div class="mb-3" id="precio-kg-granel-container" style="display:none;">
@@ -100,16 +113,19 @@
                                 <div id="precio-kg-granel" class="form-control bg-light text-center"></div>
                             </div>
                             <div class="mb-3" id="margen-pack-container" style="display:none;">
-                                <label class="form-label fw-semibold">Margen unitario (Pack):</label>
+                                <label class="form-label fw-semibold" id="margen-pack-label">Margen unitario (Pack):</label>
                                 <div id="margen-pack" class="form-control bg-light text-center"></div>
+                                <div id="margen-pack-pct" class="form-text text-center"></div>
                             </div>
                             <div class="mb-3" id="margen-granel-container" style="display:none;">
                                 <label class="form-label fw-semibold">Margen unitario (Granel):</label>
                                 <div id="margen-granel" class="form-control bg-light text-center"></div>
+                                <div id="margen-granel-pct" class="form-text text-center"></div>
                             </div>
                             <div class="mb-3" id="margen-unitario-container" style="display:none;">
                                 <label class="form-label fw-semibold">Margen estimado:</label>
                                 <div id="margen-unitario" class="form-control bg-light text-center"></div>
+                                <div id="margen-unitario-pct" class="form-text text-center"></div>
                             </div>
                             <div class="mb-3" id="stock-estimado-info" style="display:none;">
                                 <label class="form-label fw-semibold">Stock estimado:</label>
@@ -121,6 +137,44 @@
                 </form>
                 <script>
                 document.addEventListener('DOMContentLoaded', function() {
+                    // Evitar validación HTML5 del navegador (mensajes en inglés como
+                    // "Please fill out this field"). La validación la maneja Django.
+                    var formEl = document.getElementById('productoForm');
+                    if (formEl) {
+                        formEl.setAttribute('novalidate', 'novalidate');
+                        formEl.noValidate = true;
+
+                        function forceSubmitWithoutHtmlValidation() {
+                            try {
+                                formEl.noValidate = true;
+                                // submit() bypassa constraint validation
+                                formEl.submit();
+                            } catch (e) {
+                                // fallback: allow normal submit
+                                formEl.requestSubmit();
+                            }
+                        }
+
+                        var submitBtn = formEl.querySelector('button[type="submit"]');
+                        if (submitBtn) {
+                            submitBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                forceSubmitWithoutHtmlValidation();
+                            });
+                        }
+
+                        // Enter en inputs dispara submit implícito en algunos navegadores/webviews.
+                        formEl.addEventListener('keydown', function(e) {
+                            if (e.key === 'Enter') {
+                                var t = e.target;
+                                if (t && t.tagName === 'INPUT' && t.type !== 'textarea') {
+                                    e.preventDefault();
+                                    forceSubmitWithoutHtmlValidation();
+                                }
+                            }
+                        });
+                    }
+
                     function toggleFields() {
                         var tipo = document.getElementById('id_tipo_producto').value;
                         // Asignar unidad_base automáticamente según el tipo para asegurar que
@@ -136,7 +190,9 @@
                         document.getElementById('field-unidades_por_pack').style.display = (tipo === 'PACK') ? 'block' : 'none';
                         // Mostrar "kg por caja" cuando el producto sea GRANEL o CAJA
                         document.getElementById('field-kg_por_caja').style.display = (tipo === 'GRANEL' || tipo === 'CAJA') ? 'block' : 'none';
-                        document.getElementById('precio-unitario-pack-container').style.display = (tipo === 'PACK') ? 'block' : 'none';
+                        // Para PACK: si la unidad de venta es UNIDAD, mostramos costo unitario; si es PACK, no.
+                        var unidadBaseActual = document.getElementById('id_unidad_base')?.value;
+                        document.getElementById('precio-unitario-pack-container').style.display = (tipo === 'PACK' && unidadBaseActual === 'UNIDAD') ? 'block' : 'none';
                         document.getElementById('precio-kg-granel-container').style.display = (tipo === 'GRANEL') ? 'block' : 'none';
                         document.getElementById('margen-pack-container').style.display = (tipo === 'PACK') ? 'block' : 'none';
                         document.getElementById('margen-granel-container').style.display = (tipo === 'GRANEL') ? 'block' : 'none';
@@ -167,34 +223,80 @@
                             precioVenta = parseFloat(String(precioVentaInputEl.value).replace(',', '.')) || 0;
                         }
                         var unidadesPorPack = parseInt(document.getElementById('id_unidades_por_pack').value) || 0;
+                        var unidadBaseActual = document.getElementById('id_unidad_base')?.value;
                         var kgPorCaja = parseFloat(document.getElementById('id_kg_por_caja').value.replace(',', '.')) || 0;
 
                         // PACK
                         var precioUnitario = '';
                         var margenPack = '';
-                        if (tipo === 'PACK' && unidadesPorPack > 0) {
-                            precioUnitario = (precioCompra / unidadesPorPack).toFixed(2);
-                            margenPack = (precioVenta - (precioCompra / unidadesPorPack)).toFixed(2);
+                        var margenPackPct = '';
+                        if (tipo === 'PACK') {
+                            var margenPackLabel = document.getElementById('margen-pack-label');
+                            var precioUnitarioPackLabel = document.getElementById('precio-unitario-pack-label');
+
+                            if (unidadBaseActual === 'PACK') {
+                                // Venta por PACK: margen por pack = pv - pc
+                                if (margenPackLabel) margenPackLabel.textContent = 'Margen (Pack):';
+                                if (precioUnitarioPackLabel) precioUnitarioPackLabel.textContent = 'Costo unitario (referencia):';
+
+                                var margenPackNum = (precioVenta - precioCompra);
+                                margenPack = margenPackNum.toFixed(2);
+                                // % respecto al costo por pack
+                                if (precioCompra > 0) {
+                                    margenPackPct = ((margenPackNum / precioCompra) * 100).toFixed(2);
+                                }
+                                // No mostramos costo unitario cuando se vende por pack
+                                precioUnitario = '';
+                            } else if (unidadBaseActual === 'UNIDAD' && unidadesPorPack > 0) {
+                                // Venta por UNIDAD: costo unitario = pc / unidades_por_pack
+                                if (margenPackLabel) margenPackLabel.textContent = 'Margen unitario (Pack):';
+                                if (precioUnitarioPackLabel) precioUnitarioPackLabel.textContent = 'Precio unitario por pack:';
+
+                                var costoUnitPack = (precioCompra / unidadesPorPack);
+                                precioUnitario = costoUnitPack.toFixed(2);
+                                var margenPackNum = (precioVenta - costoUnitPack);
+                                margenPack = margenPackNum.toFixed(2);
+                                // % respecto al costo unitario
+                                if (costoUnitPack > 0) {
+                                    margenPackPct = ((margenPackNum / costoUnitPack) * 100).toFixed(2);
+                                }
+                            }
                         }
                         document.getElementById('precio-unitario-pack').textContent = precioUnitario ? ('$' + precioUnitario) : '';
                         document.getElementById('margen-pack').textContent = margenPack ? ('$' + margenPack) : '';
+                        document.getElementById('margen-pack-pct').textContent = margenPackPct ? ('Margen: ' + margenPackPct + '%') : '';
 
                         // GRANEL
                         var precioKgGranel = '';
                         var margenGranel = '';
+                        var margenGranelPct = '';
                         if (tipo === 'GRANEL' && kgPorCaja > 0) {
-                            precioKgGranel = (precioCompra / kgPorCaja).toFixed(2);
-                            margenGranel = (precioVenta - (precioCompra / kgPorCaja)).toFixed(2);
+                            var costoPorKg = (precioCompra / kgPorCaja);
+                            precioKgGranel = costoPorKg.toFixed(2);
+                            var margenGranelNum = (precioVenta - costoPorKg);
+                            margenGranel = margenGranelNum.toFixed(2);
+                            // % respecto al costo por kg
+                            if (costoPorKg > 0) {
+                                margenGranelPct = ((margenGranelNum / costoPorKg) * 100).toFixed(2);
+                            }
                         }
                         document.getElementById('precio-kg-granel').textContent = precioKgGranel ? ('$' + precioKgGranel) : '';
                         document.getElementById('margen-granel').textContent = margenGranel ? ('$' + margenGranel) : '';
+                        document.getElementById('margen-granel-pct').textContent = margenGranelPct ? ('Margen: ' + margenGranelPct + '%') : '';
 
                         // MARGEN para UNITARIO
                         var margenUnitario = '';
+                        var margenUnitarioPct = '';
                         if (tipo === 'UNITARIO') {
-                            margenUnitario = (precioVenta - precioCompra).toFixed(2);
+                            var margenUnitarioNum = (precioVenta - precioCompra);
+                            margenUnitario = margenUnitarioNum.toFixed(2);
+                            // % respecto al costo unitario
+                            if (precioCompra > 0) {
+                                margenUnitarioPct = ((margenUnitarioNum / precioCompra) * 100).toFixed(2);
+                            }
                         }
                         document.getElementById('margen-unitario').textContent = margenUnitario ? ('$' + margenUnitario) : '';
+                        document.getElementById('margen-unitario-pct').textContent = margenUnitarioPct ? ('Margen: ' + margenUnitarioPct + '%') : '';
                     }
                     function calcularStockUnidades() {
                         var tipo = document.getElementById('id_tipo_producto').value;
@@ -251,7 +353,12 @@
                         cantidadCajasInput.addEventListener('input', calcularStockUnidades);
                     }
                     if (unidadBaseInput) {
-                        unidadBaseInput.addEventListener('change', mostrarStockEstimado);
+                        // Cambiar unidad_base afecta cálculos de pack (por unidad vs por pack)
+                        unidadBaseInput.addEventListener('change', function() {
+                            toggleFields();
+                            calcularValores();
+                            mostrarStockEstimado();
+                        });
                     }
                     if (stockBaseInput) {
                         stockBaseInput.addEventListener('input', mostrarStockEstimado);

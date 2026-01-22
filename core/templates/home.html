@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+{% load tz %}
+{% load format_numbers %}
+{% load roles %}
+
+{% block title %}Panel Principal{% endblock %}
+
+{% block contenido %}
+<style>
+    /* Make all buttons on home page fully rounded */
+    .container-fluid .btn {
+        border-radius: 999px !important;
+    }
+    
+    /* Make all icons circular with colored background */
+    .card-header i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.2);
+        margin-right: 10px;
+        font-size: 18px;
+    }
+    
+    .btn i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.2);
+        margin-right: 8px;
+        font-size: 16px;
+    }
+    
+    /* Special styling for plus icons to make them bigger */
+    .btn .bi-plus {
+        font-size: 18px !important;
+        font-weight: bold;
+    }
+    
+    .list-group-item i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        margin-right: 5px;
+        font-size: 12px;
+    }
+
+    /* Place Últimas Actividades at the same height as Ventas module */
+    .ultimas-actividades {
+        position: relative; /* stays at the top of the column */
+        margin-top: 0; /* align with Ventas card - no gap */
+        margin-left: auto; /* align card to the right within the column */
+        max-width: 500px;
+        width: 100%;
+    }
+
+    /* On smaller screens, make the activities card full width so it stacks nicely */
+    @media (max-width: 991px) {
+        .ultimas-actividades {
+            margin-left: 0;
+            max-width: 100%;
+        }
+    }
+</style>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Tarjeta de Ventas -->
+        <div class="col-lg-8 mb-0">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-currency-dollar"></i>
+                        Módulo de Ventas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" style="align-items: center;">
+                        <div class="col-md-6">
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'venta_create' %}" class="btn btn-success shadow btn-new-product">
+                                    <i class="bi bi-plus"></i>
+                                    Nueva Venta
+                                </a>
+                                <a href="{% url 'venta_list' %}" class="btn btn-info shadow btn-new-product">
+                                    <i class="bi bi-list"></i>
+                                    Ver Ventas
+                                </a>
+                                <a href="{% url 'fiado_create' %}" class="btn btn-success shadow btn-new-product">
+                                    <i class="bi bi-journal-plus"></i>
+                                    Nuevo Fiado
+                                </a>
+                                <a href="{% url 'fiado_list' %}" class="btn btn-info shadow btn-new-product">
+                                    <i class="bi bi-journal-text"></i>
+                                    Ver Fiados
+                                </a>
+                                </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center justify-content-md-end w-100">
+                                <div class="d-flex gap-3 align-items-center" style="margin-right:7rem;">
+                                    <div class="d-flex flex-column align-items-center">
+                                        <h6 class="text-muted mb-1">Ventas del Día</h6>
+                                        <h3 class="text-primary mb-0">{{ ventas_hoy|default:0 }}</h3>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-center">
+                                        <h6 class="text-muted mb-1">Total (CLP)</h6>
+                                        <h3 class="text-success mb-0">${{ total_ventas|format_money }}</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="mt-3">
+                            <div class="input-group">
+                            <input id="comprobante-id" type="number" min="1" class="form-control" placeholder="ID venta" aria-label="ID venta" required aria-required="true">
+                            <button id="go-comprobante" class="btn btn-outline-primary shadow btn-new-product ms-2" type="button">Ir a boleta</button>
+                            <!-- feedback moved to inline toasts -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventario y Caja debajo de Ventas (cada módulo en su propia card) -->
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <!-- Inventario -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0">
+                                <i class="bi bi-box"></i>
+                                Inventario
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'producto_list' %}" class="btn btn-outline-success shadow btn-new-product">
+                                    <i class="bi bi-box-seam"></i>
+                                    Productos
+                                </a>
+                                {% if request.user|user_is_admin %}
+                                <a href="{% url 'producto_create' %}" class="btn btn-success shadow btn-new-product">
+                                    <i class="bi bi-plus"></i>
+                                    Nuevo Producto
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- Caja -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-orange text-white">
+                            <h6 class="mb-0">
+                                <i class="bi bi-cash-stack"></i>
+                                Caja
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a id="ver-cajas" href="{% url 'caja_list' %}" class="btn btn-outline-orange shadow btn-new-product" onclick="event.preventDefault(); console.log('ver-cajas clicked'); window.location.href=this.href;">
+                                    <i class="bi bi-cash"></i>
+                                    Ver Cajas
+                                </a>
+                                {% if caja_abierta %}
+                                <a href="{% url 'confirmar_cerrar_caja' %}?next={% url 'home' %}" class="btn btn-danger shadow btn-new-product">
+                                    <i class="bi bi-lock"></i>
+                                    Cerrar Caja {% if cajas_abiertas_count > 1 %}({{ cajas_abiertas_count }}){% endif %}
+                                </a>
+                                {% else %}
+                                <a href="{% url 'abrir_caja' %}?next={% url 'home' %}" class="btn btn-orange shadow btn-new-product">
+                                    <i class="bi bi-unlock"></i>
+                                    Abrir Caja
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>            </div>
+        <!-- Panel Lateral -->
+        <div class="col-lg-4 d-flex justify-content-end align-items-start">
+            <!-- Últimas Actividades (alineada a la derecha y sticky) -->
+            <div class="card ultimas-actividades">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clock-history"></i>
+                        Últimas Actividades
+                    </h6>
+                    {% if user|user_is_admin %}
+                    <a href="{% url 'auditoria_list' %}" class="btn btn-outline-light shadow btn-new-product">
+                        <i class="bi bi-arrow-right"></i> Ver todas
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                    {% if ultimas_actividades %}
+                        <div class="list-group list-group-flush">
+                            {% for actividad in ultimas_actividades %}
+                            <div class="list-group-item py-2 {% if actividad.tipo_accion == 'STOCK_BAJO' %}list-group-item-danger{% endif %}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ actividad.get_tipo_accion_display }}</h6>
+                                        {% if actividad.tipo_accion == 'CREACION_CATEGORIA' or actividad.tipo_accion == 'EDICION_CATEGORIA' or actividad.tipo_accion == 'ELIMINACION_CATEGORIA' %}
+                                        <p class="mb-1 small {% if actividad.tipo_accion == 'STOCK_BAJO' %}text-danger{% else %}text-muted{% endif %}">{{ actividad.descripcion|format_numbers_in_text }}</p>
+                                        {% else %}
+                                        <p class="mb-1 small {% if actividad.tipo_accion == 'STOCK_BAJO' %}text-danger{% else %}text-muted{% endif %}" title="{{ actividad.descripcion|format_numbers_in_text }}">{{ actividad.descripcion|format_numbers_in_text|truncatewords:16 }}</p>
+                                        {% endif %}
+                                        {% if actividad.tipo_accion != 'STOCK_BAJO' %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-person"></i> {{ actividad.usuario.username }}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ actividad.fecha_hora|localtime|date:"H:i" }}
+                                    </small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-2">
+                            <i class="bi bi-clock-history text-muted" style="font-size: 1.5rem;"></i>
+                            <p class="text-muted mt-1 mb-0 small">No hay actividades</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+;(function(){
+    var input = document.getElementById('comprobante-id');
+    var btn = document.getElementById('go-comprobante');
+    var feedback = document.getElementById('comprobante-feedback');
+
+    function clearError() {
+        if (!input) return;
+        input.classList.remove('is-invalid');
+        if (feedback) {
+            feedback.style.display = 'none';
+            feedback.textContent = '';
+        }
+    }
+
+    if (input) {
+        input.addEventListener('input', clearError);
+    }
+
+    btn?.addEventListener('click', function(){
+        var id = input?.value && input.value.trim();
+        // Empty -> show inline error
+        if (!id) {
+            if (input) {
+                input.classList.add('is-invalid');
+                showInlineMessage('Este campo es obligatorio', 'danger');
+                input.focus();
+            }
+            return;
+        }
+
+                // Build URLs from Django reverse patterns for robustness
+                var comprobantePattern = "{% url 'venta_comprobante' 0 %}"; // e.g. /ventas/0/comprobante/
+                var existsPattern = "{% url 'venta_exists' 0 %}"; // e.g. /ventas/0/exists/
+                var comprobanteUrl = comprobantePattern.replace('/0/', '/' + encodeURIComponent(id) + '/');
+                var existsUrl = existsPattern.replace('/0/', '/' + encodeURIComponent(id) + '/');
+
+                // Check existence via JSON endpoint; if exists redirect, otherwise show inline error
+                fetch(existsUrl, { method: 'GET', headers: { 'Accept': 'application/json' } })
+                    .then(function(resp) {
+                        if (!resp.ok) throw new Error('network');
+                        return resp.json();
+                    })
+                    .then(function(data) {
+                        if (data && data.exists) {
+                            window.location.href = comprobanteUrl;
+                        } else {
+                            if (input) {
+                                input.classList.add('is-invalid');
+                                showInlineMessage('ID venta erróneo', 'danger');
+                            }
+                        }
+                    })
+                    .catch(function() {
+                        if (input) {
+                            input.classList.add('is-invalid');
+                            showInlineMessage('No se pudo verificar el ID. Intente de nuevo', 'danger');
+                        }
+                    });
+    });
+})();
+</script>
+<script>
+// Inline toast helper for home (dedupe + cap)
+function showInlineMessage(msg, type) {
+    var container = document.getElementById('homeToastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'homeToastContainer';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3';
+        container.style.zIndex = '1080';
+        container.style.display = 'block';
+        document.body.appendChild(container);
+    } else {
+        container.style.display = 'block';
+    }
+
+    window.__homeActiveToasts = window.__homeActiveToasts || {};
+    window.__homeToastOrder = window.__homeToastOrder || [];
+    var MAX_TOASTS = 3;
+    var key = (type || 'info') + '|' + String(msg);
+
+    function removeToastByKey(k) {
+        try {
+            var entry = window.__homeActiveToasts[k];
+            if (entry && entry.element) entry.element.remove();
+        } catch (e) {}
+        try { if (window.__homeActiveToasts[k] && window.__homeActiveToasts[k].timeout) clearTimeout(window.__homeActiveToasts[k].timeout); } catch (e) {}
+        delete window.__homeActiveToasts[k];
+        var idx = window.__homeToastOrder.indexOf(k);
+        if (idx !== -1) window.__homeToastOrder.splice(idx, 1);
+        if (container && !container.children.length) container.style.display = 'none';
+    }
+
+    if (window.__homeActiveToasts[key]) {
+        var existing = window.__homeActiveToasts[key];
+        try { existing.element.classList.remove('show'); void existing.element.offsetWidth; existing.element.classList.add('show'); } catch (e) {}
+        try { clearTimeout(existing.timeout); } catch (e) {}
+        existing.timeout = setTimeout(function() { removeToastByKey(key); }, 3500);
+        return;
+    }
+
+    if (window.__homeToastOrder.length >= MAX_TOASTS) {
+        var oldest = window.__homeToastOrder.shift();
+        removeToastByKey(oldest);
+    }
+
+    var level = 'info';
+    if (type === 'danger' || type === 'error') level = 'danger';
+    if (type === 'warning') level = 'warning';
+    if (type === 'success') level = 'success';
+    var toast = document.createElement('div');
+    toast.className = 'toast align-items-center text-bg-' + level + ' border-0 show mb-2';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    toast.innerHTML = '<div class="d-flex"><div class="toast-body">' + String(msg) + '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
+    container.appendChild(toast);
+
+    var timeoutId = setTimeout(function() { removeToastByKey(key); }, 3500);
+    window.__homeActiveToasts[key] = { element: toast, timeout: timeoutId };
+    window.__homeToastOrder.push(key);
+    try { var bsToast = new bootstrap.Toast(toast, { delay: 3000 }); bsToast.show(); } catch (e) {}
+}
+</script>
+{% endblock %}

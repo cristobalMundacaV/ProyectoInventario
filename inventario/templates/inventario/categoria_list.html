@@ -6,7 +6,9 @@
   <h2 class="fw-bold text-primary"><i class="bi bi-tags icon-circle icon-circle-lg"></i> Categorías</h2>
   <div>
     <a href="{% url 'producto_list' %}" class="btn btn-outline-secondary btn-new-product me-2"><i class="bi bi-arrow-left"></i> Volver</a>
+    {% if request.user|user_is_admin %}
     <a href="{% url 'categoria_create' %}" class="btn btn-success btn-new-product"><i class="bi bi-plus"></i> Nueva Categoría</a>
+    {% endif %}
   </div>
 </div>
 <div class="card shadow-sm">
@@ -28,8 +30,8 @@
             <td>{{ cat.descripcion|default_if_none:"Sin descripción." }}</td>
             <td class="text-center">{{ cat.productos.count }}</td>
             <td class="text-center">
-              <a href="{% url 'categoria_update' cat.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
               {% if request.user|user_is_admin %}
+              <a href="{% url 'categoria_update' cat.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
               <a href="{% url 'categoria_delete' cat.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="bi bi-trash"></i></a>
               {% endif %}
             </td>
@@ -41,5 +43,74 @@
       </table>
     </div>
   </div>
+  <!-- Paginación -->
+  {% if categorias.has_other_pages %}
+  <nav aria-label="Pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
+      {% if categorias.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1" aria-label="Primera página">
+            <i class="bi bi-chevron-bar-left"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ categorias.previous_page_number }}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-bar-left"></i></span>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+        </li>
+      {% endif %}
+
+      {% for num in categorias.paginator.page_range %}
+        {% if categorias.number == num %}
+          <li class="page-item active">
+            <span class="page-link">{{ num }} <span class="visually-hidden">(actual)</span></span>
+          </li>
+        {% elif num > categorias.number|add:'-3' and num < categorias.number|add:'3' %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+          </li>
+        {% elif num == 1 or num == categorias.paginator.num_pages %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+          </li>
+        {% elif num == categorias.number|add:'-4' or num == categorias.number|add:'4' %}
+          <li class="page-item disabled">
+            <span class="page-link">...</span>
+          </li>
+        {% endif %}
+      {% endfor %}
+
+      {% if categorias.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ categorias.next_page_number }}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ categorias.paginator.num_pages }}" aria-label="Última página">
+            <i class="bi bi-chevron-bar-right"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-bar-right"></i></span>
+        </li>
+      {% endif %}
+    </ul>
+    <div class="text-center text-muted small mt-2">
+      Página {{ categorias.number }} de {{ categorias.paginator.num_pages }} ({{ categorias.paginator.count }} registros totales)
+    </div>
+  </nav>
+  {% endif %}
 </div>
 {% endblock %}

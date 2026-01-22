@@ -7,12 +7,13 @@ import json
 from django.utils.safestring import mark_safe
 from django.utils import timezone
 from datetime import timedelta
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from core.enums import MetodoPago, UnidadVenta
 from caja.models import Caja
 from inventario.models import Producto
-from .models import Venta, VentaDetalle
-from .forms import VentaForm, VentaDetalleFormSet
+from .models import Venta, VentaDetalle, Fiado, FiadoDetalle, FiadoAbono
+from .forms import VentaForm, VentaDetalleFormSet, FiadoForm, FiadoDetalleFormSet, FiadoAbonoForm
 from auditoria.models import Actividad
 from inventario.templatetags.format_numbers import format_money, format_decimal
 from django.shortcuts import get_object_or_404
@@ -34,6 +35,7 @@ def venta_list(request):
     fecha_hasta = request.GET.get('fecha_hasta', '')
     metodo = request.GET.get('metodo', '')
     usuario = request.GET.get('usuario', '')
+    page = request.GET.get('page', 1)
 
     ventas = Venta.objects.all().order_by('-fecha')
 
@@ -56,8 +58,14 @@ def venta_list(request):
         except Exception:
             pass
 
-    # Limitar resultado razonable
-    ventas = ventas[:200]
+    # Paginación
+    paginator = Paginator(ventas, 50)  # 50 por página
+    try:
+        ventas = paginator.page(page)
+    except PageNotAnInteger:
+        ventas = paginator.page(1)
+    except EmptyPage:
+        ventas = paginator.page(paginator.num_pages)
 
     # Preparar opciones para selects
     User = get_user_model()
@@ -162,7 +170,13 @@ def venta_comprobante(request, pk):
     """Renderiza un comprobante/boleta imprimible para la venta."""
     venta = get_object_or_404(Venta.objects.select_related('usuario', 'caja').prefetch_related('detalles__producto'), pk=pk)
     # plantilla optimizada para impresión; el usuario puede usar Ctrl+P
-    return render(request, 'ventas/venta_comprobante.html', {'venta': venta})
+    next_url = request.GET.get('next', '')
+    autoprint = request.GET.get('autoprint', '0')
+    return render(request, 'ventas/venta_comprobante.html', {
+        'venta': venta,
+        'next': next_url,
+        'autoprint': autoprint,
+    })
 
 
 @login_required
@@ -360,7 +374,7 @@ def venta_create(request):
                 except Exception:
                     venta_total_fmt = str(venta.total)
 
-                descr = f'Venta {venta.id} total ${venta_total_fmt} ({venta.metodo_pago})'
+                descr = f'Venta Nro° {venta.id} Total ${venta_total_fmt} ({venta.metodo_pago})'
                 if not Actividad.objects.filter(tipo_accion='VENTA', caja=caja_activa, descripcion__icontains=f'Venta {venta.id}').exists():
                     Actividad.objects.create(
                         usuario=usuario_actual,
@@ -392,7 +406,7 @@ def venta_create(request):
                 producto.save()
                 # Si el stock queda por debajo o igual al mínimo, generar actividad de alerta
                 try:
-                    if producto.stock_minimo is not None and producto.stock_actual_base is not None and producto.stock_actual_base <= producto.stock_minimo:
+                    if hasattr(producto, 'is_stock_bajo') and producto.is_stock_bajo():
                         # Evitar duplicados iguales en la misma caja
                         # Usar las propiedades de producto para formatear según tipo (GRANEL vs UNIDAD/PACK)
                         prod_name = str(producto.nombre).lower()
@@ -457,10 +471,331 @@ def venta_create(request):
 
 
 @login_required
+@role_required(Role.ENCARGADO)
+def fiado_list(request):
+    q = (request.GET.get('q') or '').strip()
+    estado = (request.GET.get('estado') or '').strip()
+    page = request.GET.get('page', 1)
+
+    fiados = Fiado.objects.select_related('usuario', 'caja').order_by('-fecha')
+    if q:
+        fiados = fiados.filter(cliente_nombre__icontains=q)
+    if estado:
+        fiados = fiados.filter(estado=estado)
+
+    # Paginación
+    paginator = Paginator(fiados, 50)  # 50 por página
+    try:
+        fiados = paginator.page(page)
+    except PageNotAnInteger:
+        fiados = paginator.page(1)
+    except EmptyPage:
+        fiados = paginator.page(paginator.num_pages)
+
+    return render(request, 'ventas/fiado_list.html', {
+        'fiados': fiados,
+        'filtros': {'q': q, 'estado': estado},
+        'estado_choices': Fiado.ESTADO_CHOICES,
+    })
+
+
+@transaction.atomic
+@login_required
+@role_required(Role.ENCARGADO)
+def fiado_create(request):
+    caja_activa = Caja.objects.filter(abierta=True).first()
+    if not caja_activa:
+        messages.error(request, 'No hay una caja abierta. Por favor, abra una caja primero.')
+        return redirect('home')
+
+    unidad_choices = UnidadVenta.choices
+
+    # Datos para la UI dinámica (similar a venta_form)
+    productos = Producto.objects.all()
+    products_data = []
+    product_stock_map = {}
+    for p in productos:
+        try:
+            product_stock_map[str(p.id)] = str(p.stock_actual_base or 0)
+        except Exception:
+            product_stock_map[str(p.id)] = '0'
+
+        # Por defecto, mostrar solo productos con stock > 0 para evitar frustración en UI
+        try:
+            if (p.stock_actual_base or 0) <= 0:
+                continue
+        except Exception:
+            continue
+
+        try:
+            products_data.append({
+                'id': p.id,
+                'codigo_barra': p.codigo_barra,
+                'nombre': p.nombre,
+                'precio_venta': float(p.precio_venta),
+                'tipo_producto': p.tipo_producto,
+            })
+        except Exception:
+            # si algún dato falla, igual no romper el form
+            pass
+
+    def _to_decimal(val, default=Decimal('0')):
+        try:
+            return Decimal(str(val))
+        except Exception:
+            return default
+
+    def _compute_cantidad_base(producto, unidad_venta, cantidad_ingresada):
+        q = _to_decimal(cantidad_ingresada)
+
+        def q3(x):
+            try:
+                return x.quantize(Decimal('0.001'))
+            except Exception:
+                return x
+
+        if unidad_venta == 'CAJA':
+            if getattr(producto, 'tipo_producto', None) == 'PACK':
+                unidades_por_pack = getattr(producto, 'unidades_por_pack', None)
+                if getattr(producto, 'unidad_base', None) == 'UNIDAD' and unidades_por_pack:
+                    return q3(q * _to_decimal(unidades_por_pack))
+                return q3(q)
+
+            if getattr(producto, 'tipo_producto', None) == 'GRANEL':
+                kg_por_caja = getattr(producto, 'kg_por_caja', None)
+                if getattr(producto, 'unidad_base', None) == 'KG' and kg_por_caja:
+                    return q3(q * _to_decimal(kg_por_caja))
+                return q3(q)
+
+            return q3(q)
+
+        return q3(q)
+
+    if request.method == 'POST':
+        fform = FiadoForm(request.POST)
+        dformset = FiadoDetalleFormSet(request.POST, form_kwargs={'unidad_choices': unidad_choices})
+
+        if fform.is_valid() and dformset.is_valid():
+            required = {}
+            detalles = []
+            for form in dformset:
+                if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+                    producto = form.cleaned_data['producto']
+                    unidad_venta = form.cleaned_data['unidad_venta']
+                    cantidad_ingresada = form.cleaned_data['cantidad_ingresada']
+
+                    try:
+                        if Decimal(cantidad_ingresada) <= 0:
+                            messages.error(request, 'Cantidad inválida en alguno de los productos (debe ser mayor que 0).')
+                            return render(request, 'ventas/fiado_form.html', {
+                                'fform': fform,
+                                'dformset': dformset,
+                                'products': mark_safe(json.dumps(products_data)),
+                                'product_stock_map': mark_safe(json.dumps(product_stock_map)),
+                            })
+                    except Exception:
+                        messages.error(request, 'Cantidad inválida en alguno de los productos.')
+                        return render(request, 'ventas/fiado_form.html', {
+                            'fform': fform,
+                            'dformset': dformset,
+                            'products': mark_safe(json.dumps(products_data)),
+                            'product_stock_map': mark_safe(json.dumps(product_stock_map)),
+                        })
+
+                    cantidad_base = _compute_cantidad_base(producto, unidad_venta, cantidad_ingresada)
+                    required.setdefault(producto.id, Decimal('0'))
+                    required[producto.id] += cantidad_base
+
+                    precio_unitario = producto.precio_venta
+                    subtotal = (precio_unitario * _to_decimal(cantidad_base)).quantize(Decimal('0.01'))
+
+                    detalles.append({
+                        'producto': producto,
+                        'unidad_venta': unidad_venta,
+                        'cantidad_ingresada': cantidad_ingresada,
+                        'cantidad_base': cantidad_base,
+                        'precio_unitario': precio_unitario,
+                        'subtotal': subtotal,
+                    })
+
+            # validar stock contra DB (evita depender del frontend)
+            for producto_id, required_qty in required.items():
+                stock_actual = Producto.objects.filter(pk=producto_id).values_list('stock_actual_base', flat=True).first() or Decimal('0')
+                if _to_decimal(required_qty) > _to_decimal(stock_actual):
+                    messages.error(request, 'Stock insuficiente para algunos productos.')
+                    return render(request, 'ventas/fiado_form.html', {
+                        'fform': fform,
+                        'dformset': dformset,
+                        'products': mark_safe(json.dumps(products_data)),
+                        'product_stock_map': mark_safe(json.dumps(product_stock_map)),
+                    })
+
+            total = sum(d['subtotal'] for d in detalles) or Decimal('0.00')
+            fiado = Fiado.objects.create(
+                cliente_nombre=fform.cleaned_data['cliente_nombre'],
+                cliente_telefono=fform.cleaned_data.get('cliente_telefono', ''),
+                cliente_rut=fform.cleaned_data.get('cliente_rut', ''),
+                observacion=fform.cleaned_data.get('observacion', ''),
+                usuario=request.user,
+                caja=caja_activa,
+                total=total,
+                saldo=total,
+                estado='ABIERTO',
+            )
+
+            for detalle_data in detalles:
+                FiadoDetalle.objects.create(
+                    fiado=fiado,
+                    producto=detalle_data['producto'],
+                    unidad_venta=detalle_data['unidad_venta'],
+                    cantidad_ingresada=detalle_data['cantidad_ingresada'],
+                    cantidad_base=detalle_data['cantidad_base'],
+                    precio_unitario=detalle_data['precio_unitario'],
+                    subtotal=detalle_data['subtotal'],
+                )
+                producto = detalle_data['producto']
+                producto.stock_actual_base -= detalle_data['cantidad_base']
+                producto.save()
+
+            try:
+                # Formato requerido: "Creado Fiado a (Cliente) por (unidadProducto) (nombreProducto) =$(valor)"
+                # Si hay varios productos, concatenar en una sola línea para no llenar la UI.
+                items = []
+                for d in detalles:
+                    try:
+                        cantidad = d.get('cantidad_ingresada')
+                        cantidad_fmt = format_decimal(cantidad)
+                    except Exception:
+                        cantidad_fmt = ''
+                    try:
+                        nombre = str(getattr(d.get('producto'), 'nombre', '') or '').strip()
+                    except Exception:
+                        nombre = ''
+                    try:
+                        sub = d.get('subtotal')
+                        sub_fmt = format_money(sub)
+                    except Exception:
+                        sub_fmt = ''
+
+                    if cantidad_fmt and nombre and sub_fmt:
+                        items.append(f"{cantidad_fmt} {nombre} = ${sub_fmt}")
+                    elif nombre and sub_fmt:
+                        items.append(f"{nombre} = ${sub_fmt}")
+                    elif nombre:
+                        items.append(nombre)
+
+                # Mostrar hasta 3 items para mantenerlo corto
+                if len(items) > 3:
+                    items_text = '; '.join(items[:3]) + f"; +{len(items) - 3} más"
+                else:
+                    items_text = '; '.join(items)
+
+                if items_text:
+                    descr = f"Creado Fiado a {fiado.cliente_nombre} por {items_text}"
+                else:
+                    # Fallback (sin ID)
+                    descr = f"Creado Fiado a {fiado.cliente_nombre} por ${format_money(fiado.total)}"
+                Actividad.objects.create(
+                    usuario=request.user,
+                    tipo_accion='CREACION_REGISTRO',
+                    descripcion=descr,
+                    caja=caja_activa,
+                )
+            except Exception:
+                pass
+
+            messages.success(request, f'Fiado registrado correctamente. Saldo: ${format_money(fiado.saldo)}')
+            return redirect('fiado_detail', pk=fiado.pk)
+
+        messages.error(request, 'No se pudo registrar el fiado. Revise los datos.')
+    else:
+        fform = FiadoForm()
+        dformset = FiadoDetalleFormSet(form_kwargs={'unidad_choices': unidad_choices})
+
+    products_json = mark_safe(json.dumps(products_data))
+    stock_map_json = mark_safe(json.dumps(product_stock_map))
+
+    return render(request, 'ventas/fiado_form.html', {
+        'fform': fform,
+        'dformset': dformset,
+        'products': products_json,
+        'product_stock_map': stock_map_json,
+    })
+
+
+@login_required
+@role_required(Role.ENCARGADO)
+def fiado_detail(request, pk):
+    fiado = get_object_or_404(
+        Fiado.objects.select_related('usuario', 'caja').prefetch_related('detalles__producto', 'abonos__usuario', 'abonos__caja'),
+        pk=pk,
+    )
+
+    metodo_choices = MetodoPago.choices
+    abono_form = FiadoAbonoForm(metodo_choices=metodo_choices)
+
+    return render(request, 'ventas/fiado_detail.html', {
+        'fiado': fiado,
+        'abono_form': abono_form,
+    })
+
+
+@transaction.atomic
+@login_required
+@role_required(Role.ENCARGADO)
+def fiado_abonar(request, pk):
+    fiado = get_object_or_404(Fiado, pk=pk)
+    if request.method != 'POST':
+        return redirect('fiado_detail', pk=fiado.pk)
+
+    if fiado.estado != 'ABIERTO':
+        messages.info(request, 'Este fiado no está abierto para abonos.')
+        return redirect('fiado_detail', pk=fiado.pk)
+
+    caja_activa = Caja.objects.filter(abierta=True).first()
+    if not caja_activa:
+        messages.error(request, 'No hay una caja abierta. Abra una caja para registrar abonos.')
+        return redirect('fiado_detail', pk=fiado.pk)
+
+    metodo_choices = MetodoPago.choices
+    form = FiadoAbonoForm(request.POST, metodo_choices=metodo_choices)
+    if not form.is_valid():
+        messages.error(request, 'Abono inválido. Revise los datos.')
+        return redirect('fiado_detail', pk=fiado.pk)
+
+    monto = Decimal(str(form.cleaned_data['monto']))
+    if monto <= 0:
+        messages.error(request, 'El monto debe ser mayor que 0.')
+        return redirect('fiado_detail', pk=fiado.pk)
+
+    if monto > Decimal(str(fiado.saldo)):
+        messages.error(request, 'El abono no puede ser mayor al saldo del fiado.')
+        return redirect('fiado_detail', pk=fiado.pk)
+
+    FiadoAbono.objects.create(
+        fiado=fiado,
+        monto=monto,
+        metodo_pago=form.cleaned_data['metodo_pago'],
+        referencia=form.cleaned_data.get('referencia', ''),
+        usuario=request.user,
+        caja=caja_activa,
+    )
+
+    fiado.saldo = (Decimal(str(fiado.saldo)) - monto).quantize(Decimal('0.01'))
+    if fiado.saldo <= Decimal('0.00'):
+        fiado.saldo = Decimal('0.00')
+        fiado.estado = 'PAGADO'
+    fiado.save()
+
+    messages.success(request, f'Abono registrado. Saldo actual: ${format_money(fiado.saldo)}')
+    return redirect('fiado_detail', pk=fiado.pk)
+
+
+@login_required
 @require_POST
 @role_required(Role.ENCARGADO)
 def agregar_producto_ajax(request):
-    """Endpoint AJAX para buscar un producto por `codigo` (o id) y devolver datos mínimos.
+    """Endpoint AJAX para buscar un producto por `codigo_barra` y devolver datos mínimos.
     Espera JSON: {"codigo": "...", "cantidad": 1}
     """
     try:
@@ -471,18 +806,14 @@ def agregar_producto_ajax(request):
     codigo = payload.get('codigo')
     cantidad = payload.get('cantidad', 1)
 
+    codigo = str(codigo or '').strip()
     if not codigo:
         return JsonResponse({'ok': False, 'error': 'Código vacío'}, status=400)
 
-    # Buscar por código de barra o por id
-    producto = None
     try:
         producto = Producto.objects.get(codigo_barra=codigo)
-    except Exception:
-        try:
-            producto = Producto.objects.get(pk=int(codigo))
-        except Exception:
-            return JsonResponse({'ok': False, 'error': 'Producto no encontrado'}, status=404)
+    except Producto.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Producto no encontrado'}, status=404)
 
     # Verificar stock si aplica
     try:

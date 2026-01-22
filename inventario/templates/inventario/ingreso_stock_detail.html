@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load roles %}
 {% block titulo %}Ingreso #{{ ingreso.id }}{% endblock %}
 {% block contenido %}
 <div class="container mt-4">
@@ -6,7 +7,9 @@
     <h2 class="fw-bold text-primary"><i class="bi bi-receipt icon-circle icon-circle-lg"></i> Ingreso #{{ ingreso.id }}</h2>
     <div class="d-flex gap-2">
       <a href="{% url 'ingreso_stock_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
+      {% if request.user|user_is_admin %}
       <a href="{% url 'ingreso_stock_create' %}" class="btn btn-success rounded-pill shadow btn-new-product"><i class="bi bi-plus-circle me-2"></i> Nuevo</a>
+      {% endif %}
     </div>
   </div>
 

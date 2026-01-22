@@ -6,7 +6,13 @@
 <style>
   /* Botones de filtro más anchos y estilo igual al resaltado de bajo stock */
   .filter-buttons .btn {
-    min-width: 160px;
+    min-width: 120px;
+    padding: .25rem .6rem;
+    font-size: .9rem;
+  }
+  .filter-buttons {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
   .btn-bajo-stock {
     background-color: #c82333; /* rojo más fuerte */
@@ -33,12 +39,16 @@
     {% if request.user|user_is_admin %}
     <a href="{% url 'producto_create' %}" class="btn btn-success shadow btn-new-product me-2"><i class="bi bi-plus-circle me-2"></i> Nuevo Producto</a>
     {% endif %}
+    {% if request.user|user_is_admin %}
     <button type="button" class="btn btn-outline-primary shadow btn-new-product rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#modalAnadirStock"><i class="bi bi-stack me-2"></i> Añadir Stock</button>
+    {% endif %}
     <a href="{% url 'ingreso_stock_list' %}" class="btn btn-outline-success shadow btn-new-product rounded-pill me-2"><i class="bi bi-truck me-2"></i> Ingresos</a>
     <a href="{% url 'productos_bajo_stock' %}" class="btn btn-outline-danger shadow btn-new-product rounded-pill me-2"><i class="bi bi-exclamation-triangle me-2"></i> Bajo stock</a>
     <div class="btn-group ms-auto" role="group" aria-label="Categorías">
       <a href="{% url 'categoria_list' %}" class="btn btn-outline-secondary shadow btn-new-product me-2"><i class="bi bi-tags me-2"></i> Listar Categorías</a>
+      {% if request.user|user_is_admin %}
       <button type="button" class="btn btn-outline-secondary shadow btn-new-product" data-bs-toggle="modal" data-bs-target="#modalNuevaCategoria"><i class="bi bi-plus-lg me-2"></i> Nueva Categoría</button>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -68,17 +78,26 @@
 {% endif %}
 <form method="get" class="mb-4">
   <div class="row g-2 align-items-end">
-    <div class="col-md-4">
-      <label class="form-label mb-1">Nombre</label>
-      <input type="text" id="search-nombre" name="nombre" value="{{ filtros.nombre }}" class="form-control" placeholder="Buscar por nombre..." autocomplete="off">
+    <div class="col-lg-2 col-md-3">
+      <label class="form-label mb-1 small">Nombre</label>
+      <input type="text" id="search-nombre" name="nombre" value="{{ filtros.nombre }}" class="form-control form-control-sm" placeholder="Buscar por nombre..." autocomplete="off">
     </div>
-    <div class="col-md-3">
-      <label class="form-label mb-1">Código de Barra</label>
-      <input type="text" name="codigo_barra" value="{{ filtros.codigo_barra }}" class="form-control" placeholder="Buscar por código...">
+    <div class="col-lg-2 col-md-3">
+      <label class="form-label mb-1 small">Código de Barra</label>
+      <input type="text" name="codigo_barra" value="{{ filtros.codigo_barra }}" class="form-control form-control-sm" placeholder="Buscar por código...">
     </div>
-    <div class="col-md-2 d-grid">
+    <div class="col-lg-2 col-md-3">
+      <label class="form-label mb-1 small">Categoría</label>
+      <select name="categoria" class="form-select form-select-sm">
+        <option value="" {% if not filtros.categoria %}selected{% endif %}>Todas</option>
+        {% for c in categorias %}
+          <option value="{{ c.id }}" {% if filtros.categoria|stringformat:"s" == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-6 col-md-3 d-grid">
       <div class="d-flex gap-2 filter-buttons">
-        <button type="submit" class="btn btn-primary btn-filter" style="height: calc(2.25rem + 2px); padding: .375rem .75rem; font-size:1rem; display:flex; align-items:center; justify-content:center;"><i class="bi bi-search" style="margin-right:10px;"></i> Filtrar</button>
+        <button type="submit" class="btn btn-primary btn-sm btn-filter d-flex align-items-center justify-content-center"><i class="bi bi-search" style="margin-right:10px;"></i> Filtrar</button>
         <button type="submit" name="bajo_stock" value="1" title="Mostrar productos con stock igual o menor al mínimo"
                 class="btn rounded-pill shadow btn-new-product {% if filtros.bajo_stock %}btn-bajo-stock{% else %}btn-outline-bajo-stock{% endif %}">
           <i class="bi bi-exclamation-triangle me-1"></i> Bajo stock
@@ -145,9 +164,22 @@
                               {{ producto.margen_ganancia|format_decimal:0 }}
                             {% endif %}
                           </span>
+                          <div
+                            class="small text-muted mt-1 margen-pct"
+                            data-tipo="{{ producto.tipo_producto }}"
+                            data-unidad-base="{{ producto.unidad_base }}"
+                            data-pc="{{ producto.precio_compra }}"
+                            data-pv="{{ producto.precio_venta }}"
+                            data-unidades-pack="{{ producto.unidades_por_pack|default_if_none:'' }}"
+                            data-kg-caja="{{ producto.kg_por_caja|default_if_none:'' }}"
+                          >
+                            Margen: --%
+                          </div>
                         </td>
                         <td class="text-center" {% if producto.bajo_stock %}style="background-color:#f8d7da !important"{% endif %}>
-                          <a href="{% url 'producto_update' producto.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
+                          {% if request.user|user_is_admin %}
+                            <a href="{% url 'producto_update' producto.id %}" class="btn btn-outline-primary btn-sm me-1" title="Editar"><i class="bi bi-pencil"></i></a>
+                          {% endif %}
                           {% if request.user|user_is_admin %}
                             <a href="{% url 'producto_delete' producto.id %}" class="btn btn-outline-danger btn-sm" title="Eliminar">
                               <i class="bi bi-trash"></i>
@@ -163,12 +195,128 @@
         </div>
     </div>
 </div>
+
+<!-- Paginación -->
+{% if productos.has_other_pages %}
+<nav aria-label="Pagination" class="mt-4">
+  <ul class="pagination justify-content-center">
+    {% if productos.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page=1{% if filtros.nombre %}&nombre={{ filtros.nombre }}{% endif %}{% if filtros.categoria %}&categoria={{ filtros.categoria }}{% endif %}{% if filtros.codigo_barra %}&codigo_barra={{ filtros.codigo_barra }}{% endif %}{% if filtros.bajo_stock %}&bajo_stock=1{% endif %}" aria-label="Primera página">
+          <i class="bi bi-chevron-bar-left"></i>
+        </a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="?page={{ productos.previous_page_number }}{% if filtros.nombre %}&nombre={{ filtros.nombre }}{% endif %}{% if filtros.categoria %}&categoria={{ filtros.categoria }}{% endif %}{% if filtros.codigo_barra %}&codigo_barra={{ filtros.codigo_barra }}{% endif %}{% if filtros.bajo_stock %}&bajo_stock=1{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-bar-left"></i></span>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+      </li>
+    {% endif %}
+
+    {% for num in productos.paginator.page_range %}
+      {% if productos.number == num %}
+        <li class="page-item active">
+          <span class="page-link">{{ num }} <span class="visually-hidden">(actual)</span></span>
+        </li>
+      {% elif num > productos.number|add:'-3' and num < productos.number|add:'3' %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}{% if filtros.nombre %}&nombre={{ filtros.nombre }}{% endif %}{% if filtros.categoria %}&categoria={{ filtros.categoria }}{% endif %}{% if filtros.codigo_barra %}&codigo_barra={{ filtros.codigo_barra }}{% endif %}{% if filtros.bajo_stock %}&bajo_stock=1{% endif %}">{{ num }}</a>
+        </li>
+      {% elif num == 1 or num == productos.paginator.num_pages %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}{% if filtros.nombre %}&nombre={{ filtros.nombre }}{% endif %}{% if filtros.categoria %}&categoria={{ filtros.categoria }}{% endif %}{% if filtros.codigo_barra %}&codigo_barra={{ filtros.codigo_barra }}{% endif %}{% if filtros.bajo_stock %}&bajo_stock=1{% endif %}">{{ num }}</a>
+        </li>
+      {% elif num == productos.number|add:'-4' or num == productos.number|add:'4' %}
+        <li class="page-item disabled">
+          <span class="page-link">...</span>
+        </li>
+      {% endif %}
+    {% endfor %}
+
+    {% if productos.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ productos.next_page_number }}{% if filtros.nombre %}&nombre={{ filtros.nombre }}{% endif %}{% if filtros.categoria %}&categoria={{ filtros.categoria }}{% endif %}{% if filtros.codigo_barra %}&codigo_barra={{ filtros.codigo_barra }}{% endif %}{% if filtros.bajo_stock %}&bajo_stock=1{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="?page={{ productos.paginator.num_pages }}{% if filtros.nombre %}&nombre={{ filtros.nombre }}{% endif %}{% if filtros.categoria %}&categoria={{ filtros.categoria }}{% endif %}{% if filtros.codigo_barra %}&codigo_barra={{ filtros.codigo_barra }}{% endif %}{% if filtros.bajo_stock %}&bajo_stock=1{% endif %}" aria-label="Última página">
+          <i class="bi bi-chevron-bar-right"></i>
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-bar-right"></i></span>
+      </li>
+    {% endif %}
+  </ul>
+  <div class="text-center text-muted small mt-2">
+    Página {{ productos.number }} de {{ productos.paginator.num_pages }} ({{ productos.paginator.count }} registros totales)
+  </div>
+</nav>
+{% endif %}
+
+        <script>
+          document.addEventListener('DOMContentLoaded', function () {
+            function toNumber(value) {
+              if (value === null || value === undefined) return NaN;
+              var s = String(value).trim();
+              if (!s) return NaN;
+              // Acepta coma como separador decimal por si acaso.
+              s = s.replace(',', '.');
+              var n = parseFloat(s);
+              return Number.isFinite(n) ? n : NaN;
+            }
+
+            function formatPct(n) {
+              if (!Number.isFinite(n)) return '--%';
+              return n.toFixed(2) + '%';
+            }
+
+            document.querySelectorAll('.margen-pct').forEach(function (el) {
+              var tipo = el.dataset.tipo;
+              var unidadBase = el.dataset.unidadBase;
+              var pc = toNumber(el.dataset.pc);
+              var pv = toNumber(el.dataset.pv);
+              var costoBase;
+              if (tipo === 'GRANEL') {
+                // Para GRANEL ya guardamos el costo por KG en precio_compra
+                costoBase = pc;
+              } else if (tipo === 'PACK') {
+                // Para PACK vendido por UNIDAD ya guardamos el costo por unidad en precio_compra
+                // Para PACK vendido por PACK guardamos el costo por pack
+                costoBase = pc;
+              } else {
+                costoBase = pc; // UNITARIO
+              }
+
+              if (!Number.isFinite(pv) || !Number.isFinite(costoBase) || costoBase <= 0) {
+                el.textContent = 'Margen: --%';
+                return;
+              }
+
+              var pct = ((pv - costoBase) / costoBase) * 100;
+              el.textContent = 'Margen: ' + formatPct(pct);
+            });
+          });
+        </script>
         <!-- Modales para Añadir Stock y Nueva Categoría -->
   <!-- Botón ver más/menos vendidos -->
   <div class="text-center my-4">
     <a href="{% url 'productos_vendidos' %}" class="btn btn-primary rounded-pill px-4 py-2">Ver más / menos vendidos</a>
   </div>
         <!-- Modal Añadir Stock -->
+        {% if request.user|user_is_admin %}
         <div class="modal fade" id="modalAnadirStock" tabindex="-1" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -178,35 +326,41 @@
                 </div>
                 <button type="button" class="btn-close position-absolute end-0 me-2" style="top:50%; transform:translateY(-50%);" data-bs-dismiss="modal" aria-label="Cerrar"></button>
               </div>
-              <form method="post" action="{% url 'anadir_stock' %}">
+              <form method="post" action="{% url 'anadir_stock' %}" novalidate>
                 {% csrf_token %}
                 <div class="modal-body">
                   <div class="mb-3">
                     <label class="form-label">Producto</label>
                     {{ anadir_stock_form.producto }}
                     {% if anadir_stock_form.producto.errors %}
-                      <div class="text-danger small">{{ anadir_stock_form.producto.errors }}</div>
+                      <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                        {% for error in anadir_stock_form.producto.errors %}<div>{{ error }}</div>{% endfor %}
+                      </div>
                     {% endif %}
                   </div>
                   <div class="mb-3">
                     <label class="form-label">Cantidad a añadir</label>
                     {{ anadir_stock_form.cantidad }}
                     {% if anadir_stock_form.cantidad.errors %}
-                      <div class="text-danger small">{{ anadir_stock_form.cantidad.errors }}</div>
+                      <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                        {% for error in anadir_stock_form.cantidad.errors %}<div>{{ error }}</div>{% endfor %}
+                      </div>
                     {% endif %}
                   </div>
                 </div>
                 <div class="modal-footer">
-                  <button type="submit" name="add_one" class="btn btn-primary">Añadir Stock</button>
-                  <button type="submit" name="add_another" class="btn btn-outline-success">Añadir y agregar otro</button>
+                  <button type="submit" name="add_one" class="btn btn-primary" formnovalidate>Añadir Stock</button>
+                  <button type="submit" name="add_another" class="btn btn-outline-success" formnovalidate>Añadir y agregar otro</button>
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 </div>
               </form>
             </div>
           </div>
         </div>
+        {% endif %}
 
         <!-- Modal Nueva Categoría -->
+        {% if request.user|user_is_admin %}
         <div class="modal fade" id="modalNuevaCategoria" tabindex="-1" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -216,32 +370,37 @@
                 </div>
                 <button type="button" class="btn-close position-absolute end-0 me-2" style="top:50%; transform:translateY(-50%);" data-bs-dismiss="modal" aria-label="Cerrar"></button>
               </div>
-              <form method="post" action="{% url 'categoria_create' %}">
+              <form method="post" action="{% url 'categoria_create' %}" novalidate>
                 {% csrf_token %}
                 <div class="modal-body">
                   <div class="mb-3">
                     {{ categoria_form.nombre.label_tag }}
                     {{ categoria_form.nombre }}
                     {% if categoria_form.nombre.errors %}
-                      <div class="text-danger small">{{ categoria_form.nombre.errors }}</div>
+                      <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                        {% for error in categoria_form.nombre.errors %}<div>{{ error }}</div>{% endfor %}
+                      </div>
                     {% endif %}
                   </div>
                   <div class="mb-3">
                     {{ categoria_form.descripcion.label_tag }}
                     {{ categoria_form.descripcion }}
                     {% if categoria_form.descripcion.errors %}
-                      <div class="text-danger small">{{ categoria_form.descripcion.errors }}</div>
+                      <div class="alert alert-danger small py-1 px-2 mt-2 mb-0 text-start" role="alert">
+                        {% for error in categoria_form.descripcion.errors %}<div>{{ error }}</div>{% endfor %}
+                      </div>
                     {% endif %}
                   </div>
                 </div>
                 <div class="modal-footer">
-                  <button type="submit" class="btn btn-primary">Crear</button>
+                  <button type="submit" class="btn btn-primary" formnovalidate>Crear</button>
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 </div>
               </form>
             </div>
           </div>
         </div>
+        {% endif %}
 
         {% endblock %}
 

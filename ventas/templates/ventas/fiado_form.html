@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+{% load format_numbers %}
+
+{% block titulo %}Nuevo Fiado{% endblock %}
+
+{% block contenido %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-journal-plus icon-circle icon-circle-lg"></i> Registrar Fiado</h2>
+    <a href="{% url 'fiado_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-arrow-left me-2"></i> Volver</a>
+  </div>
+
+  <div class="card shadow border-0">
+    <div class="card-body">
+      <form method="post" novalidate id="fiadoForm">
+        {% csrf_token %}
+        {{ dformset.management_form }}
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
+            {{ fform.cliente_nombre }}
+            {% for error in fform.cliente_nombre.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">RUT</label>
+            {{ fform.cliente_rut }}
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Observación</label>
+            {{ fform.observacion }}
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">Productos</h5>
+
+        <!-- Scanner de códigos de barras (solo por código) -->
+        <div class="row mb-3 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Escanear Código de Barras</label>
+            <input type="text" id="fiadoBarcodeScanner" class="form-control" placeholder="Apunte el lector aquí o escriba el código..." autocomplete="off">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Cantidad</label>
+            <input type="number" id="fiadoDefaultQuantity" class="form-control" value="1" step="1" min="1">
+          </div>
+          <div class="col-md-3">
+            <button type="button" id="btnAgregarProductoFiado" class="btn btn-success shadow btn-new-product w-100" style="height:50px; font-size:16px;">
+              <i class="bi bi-plus-circle me-2"></i> Agregar Producto
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabla dinámica -->
+        <div class="table-responsive mb-3">
+          <table class="table table-bordered table-hover" id="fiadoProductosTable">
+            <thead class="table-light">
+              <tr>
+                <th>Código</th>
+                <th>Producto</th>
+                <th>Precio Unit.</th>
+                <th style="min-width:180px;">Cantidad</th>
+                <th>Unidad</th>
+                <th>Subtotal</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="fiadoProductosTableBody">
+              <!-- filas dinámicas -->
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <th colspan="5" class="text-end">TOTAL:</th>
+                <th id="fiadoTotalAmount">$0</th>
+                <th></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Campos ocultos del formset (se generan desde la tabla) -->
+        <div id="fiadoHiddenFields" style="display:none;"></div>
+
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button type="submit" class="btn btn-success shadow btn-new-product"><i class="bi bi-check-circle me-2"></i> Guardar Fiado</button>
+          <a href="{% url 'fiado_list' %}" class="btn btn-secondary btn-new-product"><i class="bi bi-x-circle me-2"></i> Cancelar</a>
+        </div>
+      </form>
+
+      <div class="alert alert-info mt-4 mb-0">
+        Se descuenta stock al guardar el fiado. Luego podés registrar abonos desde el detalle del fiado.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const productsData = {{ products|default:'[]'|safe }};
+  const stockMap = {{ product_stock_map|default:'{}'|safe }};
+
+  const barcodeEl = document.getElementById('fiadoBarcodeScanner');
+  const qtyEl = document.getElementById('fiadoDefaultQuantity');
+  const addBtn = document.getElementById('btnAgregarProductoFiado');
+  const tbody = document.getElementById('fiadoProductosTableBody');
+  const totalEl = document.getElementById('fiadoTotalAmount');
+  const hiddenContainer = document.getElementById('fiadoHiddenFields');
+  const formEl = document.getElementById('fiadoForm');
+
+  const productByBarcode = {};
+  productsData.forEach(function(p) {
+    const cb = (p && p.codigo_barra != null) ? String(p.codigo_barra).trim() : '';
+    if (cb) productByBarcode[cb] = p;
+  });
+
+  function formatDecimal(q, decimals) {
+    const n = Number(q);
+    if (Number.isNaN(n)) return '';
+    const fixed = n.toFixed(decimals);
+    const num = Number(fixed);
+    return String(num);
+  }
+  function formatQuantity(q, unidad) {
+    if (unidad === 'KG') return formatDecimal(q, 3);
+    return formatDecimal(q, 0);
+  }
+
+  function normalizeQty(unidad, q) {
+    const n = Number(q);
+    if (!Number.isFinite(n)) return (unidad === 'KG') ? 0.001 : 1;
+    if (unidad === 'KG') return n;
+    return Math.round(n);
+  }
+
+  function getUnidadDisplay(tipoProducto) {
+    switch(tipoProducto) {
+      case 'UNITARIO': return 'UNIDAD';
+      case 'PACK': return 'CAJA';
+      case 'GRANEL': return 'KG';
+      default: return 'UNIDAD';
+    }
+  }
+
+  function getAvailableStock(productId) {
+    const raw = stockMap[String(productId)];
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function updateRowSubtotal(row) {
+    const price = parseFloat(row.getAttribute('data-price')) || 0;
+    const qty = parseFloat(row.getAttribute('data-qty')) || 0;
+    const subtotal = price * qty;
+    const subtotalCell = row.querySelector('[data-field="subtotal"]');
+    if (subtotalCell) subtotalCell.textContent = '$' + formatDecimal(subtotal, 0);
+  }
+
+  function updateTotal() {
+    let total = 0;
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach(function(row) {
+      const price = parseFloat(row.getAttribute('data-price')) || 0;
+      const qty = parseFloat(row.getAttribute('data-qty')) || 0;
+      total += (price * qty);
+    });
+    if (totalEl) totalEl.textContent = '$' + formatDecimal(total, 0);
+  }
+
+  function updateHiddenFields() {
+    hiddenContainer.innerHTML = '';
+    const rows = tbody.querySelectorAll('tr');
+
+    // TOTAL_FORMS
+    const totalFormsInput = document.getElementById('id_form-TOTAL_FORMS') || document.getElementsByName('form-TOTAL_FORMS')[0];
+    if (totalFormsInput) totalFormsInput.value = String(rows.length);
+
+    rows.forEach(function(row, idx) {
+      const productId = row.getAttribute('data-product-id');
+      const unidad = row.getAttribute('data-unidad');
+      const qty = row.getAttribute('data-qty');
+
+      const productInput = document.createElement('input');
+      productInput.type = 'hidden';
+      productInput.name = 'form-' + idx + '-producto';
+      productInput.value = productId;
+      hiddenContainer.appendChild(productInput);
+
+      const unidadInput = document.createElement('input');
+      unidadInput.type = 'hidden';
+      unidadInput.name = 'form-' + idx + '-unidad_venta';
+      unidadInput.value = unidad;
+      hiddenContainer.appendChild(unidadInput);
+
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'hidden';
+      qtyInput.name = 'form-' + idx + '-cantidad_ingresada';
+      qtyInput.value = String(qty);
+      hiddenContainer.appendChild(qtyInput);
+    });
+  }
+
+  function setRowQty(row, newQty) {
+    const productId = row.getAttribute('data-product-id');
+    const unidad = row.getAttribute('data-unidad') || 'UNIDAD';
+    const available = getAvailableStock(productId);
+    newQty = normalizeQty(unidad, newQty);
+
+    // Mínimos según unidad
+    const minQty = (unidad === 'KG') ? 0.001 : 1;
+
+    // Topes por stock
+    if (newQty > available) newQty = available;
+
+    // Si es unitario, volver a normalizar y asegurar que no pase el stock (por redondeo)
+    if (unidad !== 'KG') {
+      newQty = normalizeQty(unidad, newQty);
+      if (newQty > available) newQty = Math.floor(Number(available) || 0);
+    }
+
+    if (newQty < minQty) newQty = minQty;
+
+    row.setAttribute('data-qty', String(formatQuantity(newQty, unidad)));
+    const qtyValueEl = row.querySelector('[data-field="cantidad"]');
+    if (qtyValueEl) qtyValueEl.textContent = formatQuantity(newQty, unidad);
+    updateRowSubtotal(row);
+    updateTotal();
+    updateHiddenFields();
+  }
+
+  function attachRowEvents(row) {
+    const minusBtn = row.querySelector('.fiado-qty-minus');
+    const plusBtn = row.querySelector('.fiado-qty-plus');
+    const removeBtn = row.querySelector('.fiado-remove-row');
+
+    if (minusBtn) {
+      minusBtn.addEventListener('click', function() {
+        const qty = parseFloat(row.getAttribute('data-qty')) || 0;
+        setRowQty(row, qty - 1);
+      });
+    }
+    if (plusBtn) {
+      plusBtn.addEventListener('click', function() {
+        const qty = parseFloat(row.getAttribute('data-qty')) || 0;
+        setRowQty(row, qty + 1);
+      });
+    }
+    if (removeBtn) {
+      removeBtn.addEventListener('click', function() {
+        row.remove();
+        updateTotal();
+        updateHiddenFields();
+      });
+    }
+  }
+
+  function addProductByBarcode(barcode, quantity) {
+    const code = String(barcode || '').trim();
+    if (!code) return;
+
+    const product = productByBarcode[code];
+    if (!product) {
+      try { window.alert('Producto no encontrado: ' + code); } catch(e) {}
+      return;
+    }
+
+    const unidad = getUnidadDisplay(product.tipo_producto);
+    const available = getAvailableStock(product.id);
+    const qtyRaw = parseFloat(quantity);
+    const qty = normalizeQty(unidad, Number.isFinite(qtyRaw) ? qtyRaw : 1);
+    const minQty = (unidad === 'KG') ? 0.001 : 1;
+    const qtyFinal = (qty < minQty) ? minQty : qty;
+    if (qtyFinal > available) {
+      try { window.alert('Stock insuficiente. Disponible: ' + available); } catch(e) {}
+      return;
+    }
+
+    const existingRow = tbody.querySelector('tr[data-barcode="' + code.replace(/"/g, '\\"') + '"]');
+    if (existingRow) {
+      const currentQty = parseFloat(existingRow.getAttribute('data-qty')) || 0;
+      setRowQty(existingRow, currentQty + qtyFinal);
+      return;
+    }
+
+    const row = document.createElement('tr');
+    row.setAttribute('data-product-id', String(product.id));
+    row.setAttribute('data-barcode', code);
+    row.setAttribute('data-unidad', unidad);
+    row.setAttribute('data-price', String(product.precio_venta));
+    row.setAttribute('data-qty', String(formatQuantity(qtyFinal, unidad)));
+
+    const subtotal = (Number(product.precio_venta) * qtyFinal);
+
+    row.innerHTML =
+      '<td>' + code + '</td>' +
+      '<td>' + String(product.nombre) + '</td>' +
+      '<td>$' + formatDecimal(product.precio_venta, 0) + '</td>' +
+      '<td>' +
+        '<div class="d-flex align-items-center justify-content-center gap-2">' +
+          '<button type="button" class="btn btn-sm btn-outline-secondary fiado-qty-minus" style="border-radius:999px; width:38px;">-</button>' +
+          '<span data-field="cantidad" style="min-width:60px; text-align:center; display:inline-block;">' + formatQuantity(qtyFinal, unidad) + '</span>' +
+          '<button type="button" class="btn btn-sm btn-outline-secondary fiado-qty-plus" style="border-radius:999px; width:38px;">+</button>' +
+        '</div>' +
+      '</td>' +
+      '<td>' + unidad + '</td>' +
+      '<td data-field="subtotal">$' + formatDecimal(subtotal, 0) + '</td>' +
+      '<td class="text-center">' +
+        '<button type="button" class="btn btn-sm btn-danger fiado-remove-row" title="Eliminar" style="border-radius:999px;">' +
+          '<i class="bi bi-trash"></i>' +
+        '</button>' +
+      '</td>';
+
+    tbody.appendChild(row);
+    attachRowEvents(row);
+    updateRowSubtotal(row);
+    updateTotal();
+    updateHiddenFields();
+
+    if (barcodeEl) barcodeEl.value = '';
+    try { if (barcodeEl) barcodeEl.focus(); } catch(e) {}
+  }
+
+  if (addBtn) {
+    addBtn.addEventListener('click', function() {
+      const code = barcodeEl ? barcodeEl.value : '';
+      addProductByBarcode(code, qtyEl ? qtyEl.value : 1);
+    });
+  }
+
+  if (barcodeEl) {
+    barcodeEl.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addProductByBarcode(barcodeEl.value, qtyEl ? qtyEl.value : 1);
+      }
+    });
+  }
+
+  if (formEl) {
+    formEl.addEventListener('submit', function(e) {
+      updateHiddenFields();
+      const rows = tbody.querySelectorAll('tr');
+      if (!rows.length) {
+        e.preventDefault();
+        try { window.alert('Debe agregar al menos 1 producto.'); } catch(err) {}
+      }
+    });
+  }
+
+  // Init management values for empty table
+  updateHiddenFields();
+
+  try { if (barcodeEl) barcodeEl.focus(); } catch(e) {}
+});
+</script>
+{% endblock %}

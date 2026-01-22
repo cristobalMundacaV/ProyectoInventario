@@ -10,22 +10,54 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+# When running as a PyInstaller executable, the code lives in a temp bundle; we need
+# a writable base directory (next to the .exe) for the SQLite DB.
+_PROJECT_DIR = Path(__file__).resolve().parent.parent
+
+if getattr(sys, 'frozen', False):
+    RUNTIME_DIR = Path(sys.executable).resolve().parent
+    BUNDLE_DIR = Path(getattr(sys, '_MEIPASS', RUNTIME_DIR))
+else:
+    RUNTIME_DIR = _PROJECT_DIR
+    BUNDLE_DIR = _PROJECT_DIR
+
+BASE_DIR = RUNTIME_DIR
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-4&fvmzk$2)%m-#p1-$vn-id9jq0-r%=_*di+&ozn8#dim=^h1w'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-4&fvmzk$2)%m-#p1-$vn-id9jq0-r%=_*di+&ozn8#dim=^h1w',
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Default to production-safe behavior (DEBUG off), but keep dev friendly when running from source.
+_debug_env = os.environ.get('DJANGO_DEBUG')
+if _debug_env is None:
+    DEBUG = not getattr(sys, 'frozen', False)
+else:
+    DEBUG = _debug_env.strip() in ('1', 'true', 'True', 'yes', 'YES')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
+# Allow hosts for local EXE usage by default; can be overridden via env.
+_allowed_hosts_env = os.environ.get('INVENTARIO_ALLOWED_HOSTS')
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
+else:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    _host = os.environ.get('INVENTARIO_HOST')
+    if _host and _host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host)
+
+# Used by Django's test client
+if 'testserver' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('testserver')
 
 
 # Application definition
@@ -60,7 +92,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -81,7 +113,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': Path(os.environ.get('INVENTARIO_DB_PATH') or (BASE_DIR / 'db.sqlite3')),
     }
 }
 
@@ -132,3 +164,14 @@ SHORT_DATETIME_FORMAT = 'd/m/Y H:i'
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Collected static (for Django admin and any local assets)
+STATIC_ROOT = BUNDLE_DIR / 'staticfiles'
+
+
+# Sessions
+# For the desktop (PyInstaller) EXE use-case, users typically expect to log in each time they
+# open the app. Browsers can keep cookies across restarts, so we also clear server-side sessions
+# at startup in packaging/run_inventario_app.py.
+if os.environ.get('INVENTARIO_EXE') == '1':
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = True

@@ -61,6 +61,7 @@
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Margen de ganancia</label>
                                 <input type="text" id="margen-preview" class="form-control bg-light" readonly>
+                                <div id="margen-preview-pct" class="form-text"></div>
                             </div>
                             
                             <!-- Cálculo de kilogramos -->
@@ -97,7 +98,18 @@
                     function calcularMargen() {
                         const pc = parseFloat(compra.value.replace(',', '.')) || 0;
                         const pv = parseFloat(venta.value.replace(',', '.')) || 0;
-                        margen.value = (pv - pc).toFixed(2);
+                        const m = (pv - pc);
+                        margen.value = m.toFixed(2);
+
+                        const pctEl = document.getElementById('margen-preview-pct');
+                            if (pctEl) {
+                            // % respecto al costo
+                            if (pc > 0) {
+                                pctEl.textContent = 'Margen: ' + (((m / pc) * 100).toFixed(2)) + '%';
+                            } else {
+                                pctEl.textContent = '';
+                            }
+                        }
                     }
 
                     function calcularPrecioPorKg() {

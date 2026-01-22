@@ -1,0 +1,187 @@
+{% load format_numbers tz %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Boleta Cierre Caja #{{ caja.id }}</title>
+  <style>
+    :root {
+      --ticket-width: 80mm;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: #f5f6f8;
+      margin: 0;
+      padding: 16px;
+      color: #111827;
+    }
+
+    .ticket {
+      width: var(--ticket-width);
+      max-width: 100%;
+      background: white;
+      margin: 0 auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px 14px 10px 14px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    }
+
+    .title {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .title h1 {
+      font-size: 14px;
+      margin: 0 0 4px 0;
+      letter-spacing: .4px;
+    }
+
+    .title .sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: #374151;
+    }
+
+    .hr {
+      border-top: 1px dashed #9ca3af;
+      margin: 10px 0;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      line-height: 1.35;
+      margin: 3px 0;
+    }
+
+    .row .k { color: #374151; }
+    .row .v { font-family: var(--mono); }
+
+    .row.total {
+      font-weight: 700;
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .muted { color: #6b7280; font-size: 11px; }
+
+    .actions {
+      width: var(--ticket-width);
+      max-width: 100%;
+      margin: 12px auto 0 auto;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      color: #111827;
+    }
+
+    .btn.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: white;
+    }
+
+    .btn.danger {
+      background: #dc2626;
+      border-color: #dc2626;
+      color: white;
+    }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .ticket { box-shadow: none; border: none; border-radius: 0; }
+      .actions { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ticket">
+    <div class="title">
+      <h1>BOLETA CIERRE DE CAJA</h1>
+      <div class="sub">Caja #{{ caja.id }} · {{ caja.fecha|date:"d/m/Y" }}</div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="row"><div class="k">Apertura</div><div class="v">{{ caja.hora_apertura|localtime|date:"H:i" }}</div></div>
+    <div class="row"><div class="k">Cierre</div><div class="v">{% if caja.hora_cierre %}{{ caja.hora_cierre|localtime|date:"H:i" }}{% else %}-{% endif %}</div></div>
+    <div class="row"><div class="k">Abierta por</div><div class="v">{% if caja.abierta_por %}{{ caja.abierta_por.username }}{% else %}-{% endif %}</div></div>
+    <div class="row"><div class="k">Cerrada por</div><div class="v">{% if caja.cerrada_por %}{{ caja.cerrada_por.username }}{% else %}-{% endif %}</div></div>
+
+    <div class="hr"></div>
+
+    <div class="row"><div class="k">Monto inicial</div><div class="v">${{ caja.monto_inicial|format_money }}</div></div>
+    <div class="row total"><div class="k">Total vendido</div><div class="v">${{ caja.total_vendido|format_money }}</div></div>
+
+    <div class="row"><div class="k">Efectivo</div><div class="v">${{ caja.total_efectivo|format_money }}</div></div>
+    <div class="row"><div class="k">Tarjeta/Débito</div><div class="v">${{ caja.total_debito|format_money }}</div></div>
+    <div class="row"><div class="k">Transferencia</div><div class="v">${{ caja.total_transferencia|format_money }}</div></div>
+
+    <div class="hr"></div>
+
+    <div class="row"><div class="k">Ventas</div><div class="v">{{ cantidad_ventas }}</div></div>
+    <div class="row"><div class="k">Abonos fiado</div><div class="v">{{ cantidad_abonos_fiado }}</div></div>
+    <div class="row"><div class="k">Total abonos fiado</div><div class="v">${{ total_abonos_fiado|format_money }}</div></div>
+
+    <div class="hr"></div>
+
+    <div class="row"><div class="k">Ganancia</div><div class="v">${{ caja.ganancia_diaria|format_money }}</div></div>
+    <div class="row total"><div class="k">Efectivo esperado</div><div class="v">${{ efectivo_esperado|format_money }}</div></div>
+
+    {% if ventas_por_categoria and ventas_por_categoria.items %}
+    <div class="hr"></div>
+    <div class="row" style="font-weight:700;"><div class="k">Ventas por categoría</div><div class="v">%</div></div>
+    {% for row in ventas_por_categoria.items %}
+      <div class="row"><div class="k">{{ row.categoria }}</div><div class="v">${{ row.total|format_money }} · {{ row.pct|floatformat:2 }}%</div></div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="hr"></div>
+
+    <div class="muted" style="text-align:center;">Impreso: {% now "d/m/Y H:i" %}</div>
+    <div class="muted" style="text-align:center;">Sistema Inventario</div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" type="button" onclick="window.print()">Imprimir</button>
+    {% if next %}
+      <a class="btn" href="{{ next }}">Volver</a>
+    {% else %}
+      <a class="btn" href="/caja/">Ir a cajas</a>
+    {% endif %}
+  </div>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var autoprint = params.get('autoprint');
+      if (autoprint === null) {
+        autoprint = '{{ autoprint|default:"1" }}';
+      }
+      if (autoprint === '0') return;
+      window.addEventListener('load', function () {
+        setTimeout(function () { window.print(); }, 200);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -117,6 +117,14 @@ def _audit_changes(sender, instance, created, **kwargs):
             if getattr(sender._meta, 'app_label', '') == 'ventas' and sender.__name__.lower() == 'ventadetalle':
                 logger.debug("Skipping generic creation audit for VentaDetalle id=%s", getattr(instance, 'pk', None))
                 return
+            # Skip generic creation audit for FiadoDetalle (we log the Fiado itself in a human-friendly way from the view)
+            if getattr(sender._meta, 'app_label', '') == 'ventas' and sender.__name__.lower() == 'fiadodetalle':
+                logger.debug("Skipping generic creation audit for FiadoDetalle id=%s", getattr(instance, 'pk', None))
+                return
+            # Skip generic creation audit for Fiado (ventas view creates a descriptive activity without ids)
+            if getattr(sender._meta, 'app_label', '') == 'ventas' and sender.__name__.lower() == 'fiado':
+                logger.debug("Skipping generic creation audit for Fiado id=%s", getattr(instance, 'pk', None))
+                return
             # Skip generic creation audit for Venta (ventas app already records a nicer VENTA activity)
             if getattr(sender._meta, 'app_label', '') == 'ventas' and sender.__name__.lower() == 'venta':
                 logger.debug("Skipping generic creation audit for Venta id=%s", getattr(instance, 'pk', None))
@@ -137,12 +145,32 @@ def _audit_changes(sender, instance, created, **kwargs):
                     descr = f'Producto creado: {nombre}' if nombre else f'Creado {model_label} id={getattr(instance, "pk", None)}'
                 except Exception:
                     descr = f'Creado {model_label} id={getattr(instance, "pk", None)}'
+            elif getattr(sender._meta, 'app_label', '') == 'ventas' and sender.__name__.lower() == 'fiadoabono':
+                tipo = 'CREACION_REGISTRO'
+                try:
+                    cliente = getattr(getattr(instance, 'fiado', None), 'cliente_nombre', None) or ''
+                except Exception:
+                    cliente = ''
+                try:
+                    monto = getattr(instance, 'monto', None)
+                except Exception:
+                    monto = None
+                try:
+                    monto_fmt = format_money(monto) if monto is not None else ''
+                except Exception:
+                    monto_fmt = str(monto) if monto is not None else ''
+                if cliente and monto_fmt:
+                    descr = f'Abono fiado {cliente} ${monto_fmt}'
+                elif cliente:
+                    descr = f'Abono fiado {cliente}'
+                else:
+                    descr = f'Creado {model_label} id={getattr(instance, "pk", None)}'
             else:
                 tipo = 'CREACION_REGISTRO'
                 descr = f'Creado {model_label} id={getattr(instance, "pk", None)}'
             try:
                 Actividad.objects.create(
-                    usuario=user or getattr(instance, 'usuario', None) or user,
+                    usuario=getattr(instance, 'usuario', None) or user,
                     tipo_accion=tipo,
                     descripcion=descr,
                     caja=caja
@@ -156,6 +184,10 @@ def _audit_changes(sender, instance, created, **kwargs):
         # Skip generic update audits for Caja model because caja views create specific activities (APERTURA/CIERRE)
         if getattr(sender._meta, 'app_label', '') == 'caja' and sender.__name__.lower() == 'caja':
             logger.debug("Skipping generic audit for caja model %s id=%s", sender, getattr(instance, 'pk', None))
+            return
+        # Skip generic update audits for Venta model to prevent noisy edits after creation
+        if getattr(sender._meta, 'app_label', '') == 'ventas' and sender.__name__.lower() == 'venta':
+            logger.debug("Skipping generic audit for venta model %s id=%s", sender, getattr(instance, 'pk', None))
             return
         if not old:
             # No previous state captured; log and return
@@ -207,7 +239,7 @@ def _audit_changes(sender, instance, created, **kwargs):
             # Determine acting user display
             acting_user = None
             try:
-                acting_user = user or getattr(instance, 'usuario', None)
+                acting_user = getattr(instance, 'usuario', None) or user
             except Exception:
                 acting_user = user
             user_label = f" por {acting_user.username}" if getattr(acting_user, 'username', None) else ''
@@ -333,6 +365,86 @@ def _audit_changes(sender, instance, created, **kwargs):
                 display_nombre = new_nombre or getattr(instance, 'nombre', '') or ''
                 descr = f"Producto editado ({display_nombre}) : " + '; '.join(parts_readable)
                 tipo = 'EDICION_PRODUCTO'
+            elif getattr(sender._meta, 'app_label', '') == 'ventas' and sender.__name__.lower() == 'fiado':
+                # Mensaje más legible para fiados: no mostrar id, formatear saldo/estado
+                cliente = ''
+                try:
+                    cliente = (getattr(instance, 'cliente_nombre', None) or '').strip()
+                except Exception:
+                    cliente = ''
+
+                # Extraer cambios específicos (saldo/estado) para un formato especial al pagar
+                saldo_old = saldo_new = None
+                estado_old = estado_new = None
+                parts_readable = []
+
+                for ch in changes:
+                    parts = ch.split(':', 1)
+                    if len(parts) != 2:
+                        continue
+                    field = parts[0].strip()
+                    rest = parts[1].strip()
+                    if '->' not in rest:
+                        continue
+                    old_part, new_part = rest.split('->', 1)
+                    old_val = old_part.strip().strip("'\" ")
+                    new_val = new_part.strip().strip("'\" ")
+
+                    if field == 'saldo':
+                        saldo_old, saldo_new = old_val, new_val
+                    elif field == 'estado':
+                        estado_old, estado_new = old_val, new_val
+
+                # Caso principal: pago total (estado pasa a PAGADO)
+                if estado_new == 'PAGADO' and saldo_old is not None:
+                    try:
+                        saldo_old_fmt = format_money(saldo_old)
+                    except Exception:
+                        saldo_old_fmt = saldo_old
+                    prefix = f"Fiado {cliente}" if cliente else "Fiado"
+                    descr = f"{prefix}{user_label}: Saldo: ${saldo_old_fmt} = Pagado"
+                else:
+                    # Fallback: formato detallado (sin id)
+                    for ch in changes:
+                        parts = ch.split(':', 1)
+                        if len(parts) != 2:
+                            continue
+                        field = parts[0].strip()
+                        rest = parts[1].strip()
+                        if '->' not in rest:
+                            continue
+                        old_part, new_part = rest.split('->', 1)
+                        old_val = old_part.strip().strip("'\" ")
+                        new_val = new_part.strip().strip("'\" ")
+
+                        if field in ('saldo', 'total'):
+                            try:
+                                old_val_fmt = format_money(old_val)
+                            except Exception:
+                                old_val_fmt = old_val
+                            try:
+                                new_val_fmt = format_money(new_val)
+                            except Exception:
+                                new_val_fmt = new_val
+                            label = 'Saldo' if field == 'saldo' else 'Total'
+                            suffix = ''
+                            if field == 'saldo':
+                                try:
+                                    new_dec = Decimal(str(new_val))
+                                except Exception:
+                                    new_dec = None
+                                # Si aún queda saldo por pagar, indicarlo explícitamente
+                                if new_dec is not None and new_dec > Decimal('0') and estado_new != 'PAGADO':
+                                    suffix = ' por pagar.'
+                            parts_readable.append(f"{label}: ${old_val_fmt} -> ${new_val_fmt}{suffix}")
+                        elif field == 'estado':
+                            parts_readable.append(f"Estado: {old_val} -> {new_val}")
+                        else:
+                            parts_readable.append(f"{field}: {_fmt_val(old_val)} -> {_fmt_val(new_val)}")
+
+                    prefix = f"Fiado {cliente}" if cliente else "Fiado"
+                    descr = f"{prefix}{user_label}: " + '; '.join(parts_readable)
+                tipo = 'EDICION_REGISTRO'
             else:
                 descr = f'Actualización {model_label} id={getattr(instance, "pk", None)}{user_label}: ' + '; '.join(changes)
                 tipo = 'EDICION_REGISTRO'
@@ -379,7 +491,7 @@ def _audit_delete(sender, instance, **kwargs):
 
         try:
             Actividad.objects.create(
-                usuario=user or getattr(instance, 'usuario', None) or user,
+                usuario=getattr(instance, 'usuario', None) or user,
                 tipo_accion=tipo,
                 descripcion=descr,
                 caja=caja
@@ -412,7 +524,7 @@ def venta_creada(sender, instance, created, **kwargs):
                 except Exception:
                     total_fmt = str(instance.total)
 
-            descr = f'Venta {instance.id} total ${total_fmt} ({instance.metodo_pago})'
+            descr = f'Venta Nro° {instance.id} Total ${total_fmt} ({instance.metodo_pago})'
             exists = Actividad.objects.filter(tipo_accion='VENTA', caja=caja, descripcion__icontains=f'Venta {instance.id}').exists()
             if not exists:
                 try:

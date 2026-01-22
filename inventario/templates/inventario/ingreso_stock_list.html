@@ -1,11 +1,14 @@
 {% extends 'base.html' %}
+{% load roles %}
 {% block titulo %}Ingresos de Stock{% endblock %}
 {% block contenido %}
 <div class="container mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="fw-bold text-primary"><i class="bi bi-truck icon-circle icon-circle-lg"></i> Ingresos de Stock</h2>
     <div class="d-flex gap-2">
+      {% if request.user|user_is_admin %}
       <a href="{% url 'ingreso_stock_create' %}" class="btn btn-success rounded-pill shadow btn-new-product"><i class="bi bi-plus-circle me-2"></i> Nuevo Ingreso</a>
+      {% endif %}
       <a href="{% url 'producto_list' %}" class="btn btn-outline-secondary rounded-pill shadow btn-new-product"><i class="bi bi-box me-2"></i> Productos</a>
     </div>
   </div>
@@ -44,5 +47,75 @@
       </table>
     </div>
   </div>
+  
+  <!-- Paginación -->
+  {% if ingresos.has_other_pages %}
+  <nav aria-label="Pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
+      {% if ingresos.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1" aria-label="Primera página">
+            <i class="bi bi-chevron-bar-left"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ingresos.previous_page_number }}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-bar-left"></i></span>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+        </li>
+      {% endif %}
+
+      {% for num in ingresos.paginator.page_range %}
+        {% if ingresos.number == num %}
+          <li class="page-item active">
+            <span class="page-link">{{ num }} <span class="visually-hidden">(actual)</span></span>
+          </li>
+        {% elif num > ingresos.number|add:'-3' and num < ingresos.number|add:'3' %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+          </li>
+        {% elif num == 1 or num == ingresos.paginator.num_pages %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+          </li>
+        {% elif num == ingresos.number|add:'-4' or num == ingresos.number|add:'4' %}
+          <li class="page-item disabled">
+            <span class="page-link">...</span>
+          </li>
+        {% endif %}
+      {% endfor %}
+
+      {% if ingresos.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ingresos.next_page_number }}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ ingresos.paginator.num_pages }}" aria-label="Última página">
+            <i class="bi bi-chevron-bar-right"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link"><i class="bi bi-chevron-bar-right"></i></span>
+        </li>
+      {% endif %}
+    </ul>
+    <div class="text-center text-muted small mt-2">
+      Página {{ ingresos.number }} de {{ ingresos.paginator.num_pages }} ({{ ingresos.paginator.count }} registros totales)
+    </div>
+  </nav>
+  {% endif %}
 </div>
 {% endblock %}

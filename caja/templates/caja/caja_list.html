@@ -1,0 +1,184 @@
+{% extends 'base.html' %}{% load format_numbers tz %}
+{% block titulo %}Cajas{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-primary"><i class="bi bi-cash-stack icon-circle icon-circle-lg"></i> Cajas</h2>
+  <div class="d-flex gap-2">
+  <a href="{% url 'ganancia_diaria_hoy' %}" class="btn btn-outline-primary shadow btn-new-product rounded-pill"><i class="bi bi-graph-up me-1"></i> Ganancia diaria</a>
+        {% if not cajas_abiertas %}
+        <a href="{% url 'abrir_caja' %}" class="btn btn-success shadow btn-new-product"><i class="bi bi-plus-circle"></i> Abrir Caja</a>
+        {% else %}
+        <a href="{% url 'confirmar_cerrar_caja' %}" class="btn btn-danger shadow btn-new-product"> <i class="bi bi-lock"></i> Cerrar Caja</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if messages %}
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080;">
+    {% for message in messages %}
+      <div class="toast align-items-center text-bg-{{ message.tags }} border-0 show mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body">
+            <i class="bi bi-info-circle-fill me-2"></i>{{ message }}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+      toastElList.forEach(function(toastEl) {
+        var option = { delay: 3000 };
+        var bsToast = new bootstrap.Toast(toastEl, option);
+        bsToast.show();
+      });
+    });
+  </script>
+{% endif %}
+
+<form method="get" class="mb-4">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label mb-1">Desde</label>
+      <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label mb-1">Hasta</label>
+      <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label mb-1">Estado</label>
+      <select name="estado" class="form-control">
+        <option value="" {% if filtros.estado == '' %}selected{% endif %}>Todos</option>
+        <option value="abierta" {% if filtros.estado == 'abierta' %}selected{% endif %}>Abierta</option>
+        <option value="cerrada" {% if filtros.estado == 'cerrada' %}selected{% endif %}>Cerrada</option>
+      </select>
+    </div>
+    <div class="col-md-3 d-grid">
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-new-product"><i class="bi bi-search"></i> Filtrar</button>
+        <a href="{% url 'caja_list' %}" class="btn rounded-pill shadow btn-new-product btn-outline-secondary" title="Quitar filtros">
+          <i class="bi bi-x-circle me-1"></i> Limpiar filtros
+        </a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Monto Inicial</th>
+                        <th>Hora Apertura</th>
+                        <th>Hora Cierre</th>
+                        <th>Total Vendido</th>
+                        <th>Efectivo</th>
+                        <th>Tarjeta</th>
+                        <th>Transferencia</th>
+                        <th>Ganancia</th>
+                        
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for caja in cajas %}
+                    <tr>
+                        <td>{{ caja.fecha|date:"d/m/Y" }}</td>
+                        <td>{% if caja.abierta %}<span class="badge bg-success">Abierta</span>{% else %}<span class="badge bg-danger">Cerrada</span>{% endif %}</td>
+                        <td>${{ caja.monto_inicial|format_money }}</td>
+                        <td>{{ caja.hora_apertura|localtime|date:"H:i" }}</td>
+                        <td>{% if caja.hora_cierre %}{{ caja.hora_cierre|localtime|date:"H:i" }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                        <td>${{ caja.total_vendido|format_money }}</td>
+                        <td>${{ caja.total_efectivo|format_money }}</td>
+                        <td>${{ caja.total_debito|format_money }}</td>
+                        <td>${{ caja.total_transferencia|format_money }}</td>
+                        <td>${{ caja.ganancia_diaria|format_money }}</td>
+                        
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="10" class="text-center text-muted">No hay cajas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Paginación -->
+{% if cajas.has_other_pages %}
+<nav aria-label="Pagination" class="mt-4">
+  <ul class="pagination justify-content-center">
+    {% if cajas.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page=1{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}" aria-label="Primera página">
+          <i class="bi bi-chevron-bar-left"></i>
+        </a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="?page={{ cajas.previous_page_number }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-bar-left"></i></span>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+      </li>
+    {% endif %}
+
+    {% for num in cajas.paginator.page_range %}
+      {% if cajas.number == num %}
+        <li class="page-item active">
+          <span class="page-link">{{ num }} <span class="visually-hidden">(actual)</span></span>
+        </li>
+      {% elif num > cajas.number|add:'-3' and num < cajas.number|add:'3' %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}">{{ num }}</a>
+        </li>
+      {% elif num == 1 or num == cajas.paginator.num_pages %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}">{{ num }}</a>
+        </li>
+      {% elif num == cajas.number|add:'-4' or num == cajas.number|add:'4' %}
+        <li class="page-item disabled">
+          <span class="page-link">...</span>
+        </li>
+      {% endif %}
+    {% endfor %}
+
+    {% if cajas.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ cajas.next_page_number }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="?page={{ cajas.paginator.num_pages }}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}" aria-label="Última página">
+          <i class="bi bi-chevron-bar-right"></i>
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+      </li>
+      <li class="page-item disabled">
+        <span class="page-link"><i class="bi bi-chevron-bar-right"></i></span>
+      </li>
+    {% endif %}
+  </ul>
+  <div class="text-center text-muted small mt-2">
+    Página {{ cajas.number }} de {{ cajas.paginator.num_pages }} ({{ cajas.paginator.count }} registros totales)
+  </div>
+</nav>
+{% endif %}
+
+{% endblock %}

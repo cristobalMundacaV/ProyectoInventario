@@ -1,0 +1,182 @@
+{% load format_numbers tz %}
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Comprobante Venta {{ venta.id }}</title>
+    <style>
+        :root {
+            --ticket-width: 80mm;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            --sans: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--sans);
+            background: #f5f6f8;
+            margin: 0;
+            padding: 16px;
+            color: #111827;
+        }
+
+        .ticket {
+            width: var(--ticket-width);
+            max-width: 100%;
+            background: white;
+            margin: 0 auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 14px 14px 10px 14px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        }
+
+        .title { text-align: center; margin-bottom: 10px; }
+        .title h1 { font-size: 14px; margin: 0 0 4px 0; letter-spacing: .4px; }
+        .title .sub { font-family: var(--mono); font-size: 11px; color: #374151; }
+
+        .hr { border-top: 1px dashed #9ca3af; margin: 10px 0; }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 12px;
+            line-height: 1.35;
+            margin: 3px 0;
+        }
+        .row .k { color: #374151; }
+        .row .v { font-family: var(--mono); }
+        .row.total { font-weight: 700; font-size: 13px; margin-top: 6px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th {
+            text-align: left;
+            font-size: 11px;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 6px 0;
+        }
+        td {
+            padding: 6px 0;
+            border-bottom: 1px dashed #e5e7eb;
+            vertical-align: top;
+        }
+        .right { text-align: right; font-family: var(--mono); }
+        .prod { font-weight: 600; }
+        .meta { color: #6b7280; font-size: 11px; }
+
+        .actions {
+            width: var(--ticket-width);
+            max-width: 100%;
+            margin: 12px auto 0 auto;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #111827;
+        }
+        .btn.primary { background: #2563eb; border-color: #2563eb; color: white; }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .ticket { box-shadow: none; border: none; border-radius: 0; }
+            .actions { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ticket">
+        <div class="title">
+            <h1>COMPROBANTE DE VENTA</h1>
+            <div class="sub">Venta #{{ venta.id }} · {{ venta.fecha|localtime|date:"d/m/Y H:i" }}</div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="row"><div class="k">Usuario</div><div class="v">{{ venta.usuario.username }}</div></div>
+        <div class="row"><div class="k">Método</div><div class="v">{{ venta.get_metodo_pago_display }}</div></div>
+        <div class="row"><div class="k">Caja</div><div class="v">{% if venta.caja %}{{ venta.caja.fecha|date:"d/m/Y" }}{% else %}-{% endif %}</div></div>
+
+        <div class="hr"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th class="right">Cant</th>
+                    <th class="right">Subt</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for det in venta.detalles.all %}
+                    <tr>
+                        <td>
+                            <div class="prod">{{ det.producto }}</div>
+                            <div class="meta">$ {{ det.precio_unitario|format_money }} c/u</div>
+                        </td>
+                        <td class="right">{{ det.cantidad_ingresada|format_decimal:3 }} {{ det.unidad_venta }}</td>
+                        <td class="right">$ {{ det.subtotal|format_money }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="hr"></div>
+
+        <div class="row total"><div class="k">TOTAL</div><div class="v">$ {{ venta.total|format_money }}</div></div>
+
+        <div class="hr"></div>
+        <div class="meta" style="text-align:center;">Impreso: {% now "d/m/Y H:i" %}</div>
+        <div class="meta" style="text-align:center; font-weight:700;">Sistema Inventario</div>
+    </div>
+
+    <div class="actions">
+        <button class="btn primary" type="button" onclick="window.print()">Imprimir</button>
+        {% if next %}
+            <a class="btn" href="{{ next }}">Volver</a>
+        {% else %}
+            <a class="btn" href="/ventas/">Ir a ventas</a>
+        {% endif %}
+        <button class="btn" type="button" onclick="handleClose()">Cerrar</button>
+    </div>
+
+    <script>
+        (function () {
+            var params = new URLSearchParams(window.location.search);
+            var autoprint = params.get('autoprint');
+            if (autoprint === null) {
+                autoprint = '{{ autoprint|default:"0" }}';
+            }
+            if (autoprint !== '1') return;
+            window.addEventListener('load', function () {
+                setTimeout(function () { window.print(); }, 200);
+            });
+        })();
+
+        function handleClose() {
+            var closeTarget = "{{ next|default:'' }}";
+            if (!closeTarget) {
+                closeTarget = "{% url 'home' %}";
+            }
+            try {
+                window.close();
+            } catch (e) {}
+            setTimeout(function () { window.location.href = closeTarget; }, 50);
+        }
+    </script>
+</body>
+</html>
